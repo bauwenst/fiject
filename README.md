@@ -1,2 +1,45 @@
 # Fiject
 Object-oriented, two-stage PDF figure generation library for Python.
+
+## Features
+- Two-stage figure generation:
+  - **Addition stage:** Incrementally add data to figure objects, rather than needing to do it all at once along with
+                        visual parameters. Data caching allows skipping this step when a figure needs to be reformatted but not recomputed.
+  - **Commit stage:** Format the data stored in a figure object, with a simple interface that hides the complexities of `matplotlib` and `seaborn`.
+- Supported figure types:
+  - `LineGraph`: points connected by lines.
+  - `Bars`: bar plot on a categorical axis.
+  - `MultiHistogram`: one or more histograms on the same numerical axis. Can also be committed to box plots.
+  - `ScatterPlot`: unconnected points.
+  - `Table`: LaTeX tables with hierarchical rows and hierarchical columns, column stylisation (e.g. rounding, min/max bolding, ...) and borders where you need them.
+
+## Example
+Let's say you have a machine learning project where a classifier called `model` is trained and then evaluated on precision (Pr), 
+recall (Re) and F1 score, for 5 different values of a hyperparameter *h*. You would do your experiments as follows:
+```python
+from fiject import LineGraph, CacheMode
+
+g = LineGraph("project-results", caching=CacheMode.IF_MISSING)
+if g.needs_computation:
+    h_values = [0.1, 0.25, 0.5, 0.7, 1.0]
+    for h in h_values:
+        # ...
+        # model.trainModel(h)
+        # pr, re, f1 = model.evaluateYourModel()
+        # ...
+        g.add("Pr",    h, pr)
+        g.add("Re",    h, re)
+        g.add("$F_1$", h, f1)
+              
+g.commit(x_label="Hyperparameter value", y_label="Binary classification performance [\\%]",
+         y_lims=(0, 100), x_tickspacing=0.1, y_tickspacing=10, aspect_ratio=(4,3))
+```
+A PDF `project-results_0.pdf` will appear, and the data will be cached in a file `project-results_0.json`.
+
+Notice that the `CacheMode` along with the check `if g.needs_computation` will ensure that you don't
+have to redo your computation if you don't like the way your figure came out the first time. You can
+just change the parameters to `g.commit()` and re-run *the same code* to get a new PDF `project-results_1.pdf`
+instantly.
+
+## Showcase
+A collage of all the figures I have drawn with this code across many university projects. Coming soon!
