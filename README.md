@@ -31,8 +31,8 @@ if g.needs_computation:
         g.add("Re",    h, re)
         g.add("$F_1$", h, f1)
               
-g.commit(x_label="Hyperparameter value", y_label="Binary classification performance [\\%]",
-         y_lims=(0, 100), x_tickspacing=0.1, y_tickspacing=10, aspect_ratio=(4,3))
+g.commit(aspect_ratio=(4,3), y_lims=(0, 100), x_tickspacing=0.1, y_tickspacing=10,
+         x_label="Hyperparameter value", y_label="Binary classification performance [\\%]")
 ```
 A PDF `project-results_0.pdf` will appear, and the data will be cached in a file `project-results_0.json`.
 
@@ -42,4 +42,33 @@ just change the parameters to `g.commit()` and re-run *the same code* to get a n
 instantly.
 
 ## Showcase
-A collage of all the figures I have drawn with this code across many university projects. Coming soon!
+A collage of all the figures I have drawn with this code across many university projects.
+
+### Line graphs
+<p align="middle" >
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/59e49cab-55ad-466b-b6bb-a681f18088d8" height="325" />⠀
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/23269b46-6786-40ae-a8c9-1b199939846f" height="325" />
+  <br>
+  <br>
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/c520a27a-a8bd-483b-98a6-269648f5baff" height="300" />
+</p>
+
+### Histograms
+<p align="middle">
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/97b31ed8-729e-4fcc-9ac6-396636a4f2eb" height="300" />
+</p>
+
+### Bar plots
+<p align="middle">
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/837cb644-263c-4cae-a301-dff5736cf10f" height="400" />
+</p>
+
+### Scatterplots
+<p align="middle">
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/119eba35-3116-469c-922a-f8d56d530cd0" height="400" />
+</p>
+
+### Tables
+<p align="middle">
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/ce488b65-ddd5-4a82-9899-380431d7a5dc" height="300" />
+</p>
