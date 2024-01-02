@@ -1,0 +1,14 @@
+TODO:
+    - In the README, the pip command should possibly use a subdirectory because we use src/:
+        https://github.com/bauwenst/fiject.git#subdirectory=src/fiject (https://stackoverflow.com/a/46666538/9352077)
+      If not (I didn't have to when using -e .), it might also be good to point out to the user that although the package
+      is nested inside src/, pip detects this automatically.
+    - Histogram is a subclass of MultiHistogram, but has some methods that are "more sophisticated" that should be
+      integrated into MultiHistogram.
+    - The JSON and PDF names are checked for availability independently, so JSON _0 can correspond to PDF _2 etc.
+    - Tables:
+         - Should be easy to drop rows (possibly you should be able to do this before committing though) to get a reduced table
+         - Align &s
+         - Deltas should be able to be coloured. That's a LaTeX issue, though.
+    - If people are going to be using this script as a library, they need a way to set up the output path (and the scale too, while we're at it).
+      Probably do it like logging does it.
