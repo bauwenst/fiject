@@ -46,8 +46,8 @@ A collage of all the figures I have drawn with this code across many university 
 
 ### Line graphs
 <p align="middle" >
-  <img src="https://github.com/bauwenst/fiject/assets/145220868/59e49cab-55ad-466b-b6bb-a681f18088d8" height="325" />⠀
-  <img src="https://github.com/bauwenst/fiject/assets/145220868/23269b46-6786-40ae-a8c9-1b199939846f" height="325" />
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/59e49cab-55ad-466b-b6bb-a681f18088d8" width="40%" />⠀
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/23269b46-6786-40ae-a8c9-1b199939846f" width="52%" />
   <br>
   <br>
   <img src="https://github.com/bauwenst/fiject/assets/145220868/c520a27a-a8bd-483b-98a6-269648f5baff" height="300" />
