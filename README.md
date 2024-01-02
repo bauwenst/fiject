@@ -52,6 +52,9 @@ Open a terminal and run:
 ```commandline
 pip install git+https://github.com/bauwenst/fiject.git
 ```
+Note that although the package's source code resides in the subdirectory `src/fiject/`, there is no need to mention this
+anywhere (not by you in the above command, and not even by me internally) because `pip` is smart enough to figure this
+out itself. You hence do *not* need to add a `#subdirectory` argument (despite [the docs saying you do](https://pip.pypa.io/en/stable/topics/vcs-support/#url-fragments)).
 
 ### Developer install
 Open a terminal and, instead of the above, run:

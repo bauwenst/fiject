@@ -1,8 +1,4 @@
 TODO:
-    - In the README, the pip command should possibly use a subdirectory because we use src/:
-        https://github.com/bauwenst/fiject.git#subdirectory=src/fiject (https://stackoverflow.com/a/46666538/9352077)
-      If not (I didn't have to when using -e .), it might also be good to point out to the user that although the package
-      is nested inside src/, pip detects this automatically.
     - Histogram is a subclass of MultiHistogram, but has some methods that are "more sophisticated" that should be
       integrated into MultiHistogram.
     - The JSON and PDF names are checked for availability independently, so JSON _0 can correspond to PDF _2 etc.
