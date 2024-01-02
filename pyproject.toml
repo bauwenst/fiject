@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fiject"
+version = "2024.01.01"
+dependencies = [
+  "matplotlib >= 3.5.3",
+  "seaborn >= 0.12.1"
+]
+requires-python = ">= 3.10"
+authors = [
+  {name = "Thomas Bauwens", email = "thomas.bauwens@kuleuven.be"}
+]
+maintainers = [
+  {name = "Thomas Bauwens", email = "thomas.bauwens@kuleuven.be"}
+]
+description = "Object-oriented, two-stage PDF figure generation library for Python."
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["figures", "graphing", "drawing", "graphs", "visualization", "diagrams", "experiments", "caching"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Repository = "https://github.com/bauwenst/fiject"
+"Bug Tracker" = "https://github.com/bauwenst/fiject/issues"

@@ -1,5 +1,8 @@
 # Fiject
-Object-oriented, two-stage PDF figure generation library for Python.
+Object-oriented, two-stage PDF figure generators in Python.
+
+Gives an answer to *"How can I change the look of a figure without re-computing its data?"* which isn't possible in
+`matplotlib` nor `seaborn`.
 
 ## Features
 - Two-stage figure generation:
@@ -24,7 +27,7 @@ if g.needs_computation:
     h_values = [0.1, 0.25, 0.5, 0.7, 1.0]
     for h in h_values:
         # ...
-        # model.trainModel(h)
+        # model.trainModel(h)  # Takes hours to compute. We don't want to repeat it just to reformat the graph!
         # pr, re, f1 = model.evaluateYourModel()
         # ...
         g.add("Pr",    h, pr)
@@ -40,6 +43,35 @@ Notice that the `CacheMode` along with the check `if g.needs_computation` will e
 have to redo your computation if you don't like the way your figure came out the first time. You can
 just change the parameters to `g.commit()` and re-run *the same code* to get a new PDF `project-results_1.pdf`
 instantly.
+
+## Installation
+You can install `fiject` as any other package, or as a developer if you want to tinker with the source yourself.
+
+### Normal install
+Open a terminal and run:
+```commandline
+pip install git+https://github.com/bauwenst/fiject.git
+```
+
+### Developer install
+Open a terminal and, instead of the above, run:
+```commandline
+git clone https://github.com/bauwenst/fiject.git
+cd fiject
+pip install -e .
+```
+The last command will detect the `pyproject.toml` file (`pip install`), look for the `fiject/__init__.py` file in the 
+current directory (`.`), and put a symlink to this folder in Python's `site-packages` folder (`-e`). This means that
+when you `import fiject`, it is imported from the current folder and hence any changes you make here are applied immediately.
+
+## Credit
+This package was developed over the span of multiple years (2021-2023) and across multiple research papers at university.
+If you produce figures for your own reports with this package, please be a kind human and acknowledge my work by crediting
+this repository in a footnote. For example, in LaTeX: 
+```latex
+\footnote{All figures were made using Fiject (\url{https://github.com/bauwenst/fiject}), 
+          a Python package by ir.\ Thomas Bauwens.}
+```
 
 ## Showcase
 A collage of all the figures I have drawn with this code across many university projects.
