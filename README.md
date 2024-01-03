@@ -85,25 +85,25 @@ A collage of all the figures I have drawn with this code across many university 
   <img src="https://github.com/bauwenst/fiject/assets/145220868/23269b46-6786-40ae-a8c9-1b199939846f" width="52%" />
   <br>
   <br>
-  <img src="https://github.com/bauwenst/fiject/assets/145220868/c520a27a-a8bd-483b-98a6-269648f5baff" height="300" />
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/c520a27a-a8bd-483b-98a6-269648f5baff" width="70%" />
 </p>
 
 ### Histograms
 <p align="middle">
-  <img src="https://github.com/bauwenst/fiject/assets/145220868/97b31ed8-729e-4fcc-9ac6-396636a4f2eb" height="300" />
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/97b31ed8-729e-4fcc-9ac6-396636a4f2eb" width="68%" />
 </p>
 
 ### Bar plots
 <p align="middle">
-  <img src="https://github.com/bauwenst/fiject/assets/145220868/837cb644-263c-4cae-a301-dff5736cf10f" height="400" />
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/837cb644-263c-4cae-a301-dff5736cf10f" width="65%" />
 </p>
 
 ### Scatterplots
 <p align="middle">
-  <img src="https://github.com/bauwenst/fiject/assets/145220868/119eba35-3116-469c-922a-f8d56d530cd0" height="400" />
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/119eba35-3116-469c-922a-f8d56d530cd0" width="60%" />
 </p>
 
 ### Tables
 <p align="middle">
-  <img src="https://github.com/bauwenst/fiject/assets/145220868/ce488b65-ddd5-4a82-9899-380431d7a5dc" height="300" />
+  <img src="https://github.com/bauwenst/fiject/assets/145220868/ce488b65-ddd5-4a82-9899-380431d7a5dc" width="75%" />
 </p>
