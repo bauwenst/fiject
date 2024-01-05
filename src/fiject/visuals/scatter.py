@@ -1,4 +1,4 @@
-from .general import *
+from ..general import *
 
 import numpy as np
 import matplotlib.ticker as tkr
@@ -26,7 +26,7 @@ class ScatterPlot(Diagram):
         self.data[family_name][0].extend(xs)
         self.data[family_name][1].extend(ys)
 
-    def commit(self, aspect_ratio: Tuple[float,float]=DEFAULT_ASPECT_RATIO, x_label="", y_label="", legend=False,
+    def commit(self, aspect_ratio: Tuple[float,float]=None, x_label="", y_label="", legend=False,
                x_lims=None, y_lims=None, logx=False, logy=False, x_tickspacing=None, y_tickspacing=None, grid=False,
                family_colours=None, family_sizes=None, randomise_markers=False, only_for_return=False):
         with ProtectedData(self):
@@ -83,7 +83,7 @@ class ScatterPlot(Diagram):
 
             if grid:
                 ax.set_axisbelow(True)
-                ax.grid(True, linewidth=DEFAULT_GRIDWIDTH)
+                ax.grid(True, linewidth=DEFAULTS.GRIDWIDTH)
 
             if legend:
                 ax.legend(scatters, names, loc='upper left', markerscale=10, ncol=2)  # https://stackoverflow.com/questions/17411940/matplotlib-scatter-plot-legend

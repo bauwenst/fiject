@@ -1,4 +1,4 @@
-from .general import *
+from ..general import *
 
 
 class Bars(Diagram):
@@ -24,7 +24,7 @@ class Bars(Diagram):
         self.data[bar_slice_family].extend(heights)
 
     def commit(self, group_names: Sequence[str], bar_width: float, group_spacing: float, y_label: str="",
-               diagonal_labels=True, aspect_ratio=DEFAULT_ASPECT_RATIO,
+               diagonal_labels=True, aspect_ratio=None,
                y_tickspacing: float=None, log_y: bool=False):
         """
         The reason that group names are not given beforehand is because they are much like an x_label.
@@ -54,7 +54,7 @@ class Bars(Diagram):
 
             # Grid
             main_ax.set_axisbelow(True)  # Put grid behind the bars.
-            main_ax.grid(True, axis="y", linewidth=DEFAULT_GRIDWIDTH)
+            main_ax.grid(True, axis="y", linewidth=DEFAULTS.GRIDWIDTH)
             main_ax.legend()
 
             self.exportToPdf(fig)

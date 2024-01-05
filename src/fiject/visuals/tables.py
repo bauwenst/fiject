@@ -1,5 +1,5 @@
-from .general import *
-from .util.printing import lprint
+from ..general import *
+from ..util.printing import lprint
 
 import dataclasses
 from dataclasses import dataclass
@@ -429,7 +429,7 @@ class Table(Diagram):
                     [last_line]
 
             print(f"Writing .tex {self.name} ...")
-            with open(PathHandling.getSafePath(PATH_FIGURES, self.name, ".tex"), "w") as file:
+            with open(PathHandling.getSafePath(PathHandling.getProductionFolder(), self.name, ".tex"), "w") as file:
                 file.write("\n".join(lines))
 
             lprint(lines)

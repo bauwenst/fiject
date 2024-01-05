@@ -1,4 +1,4 @@
-from .general import *
+from ..general import *
 from .scatter import ScatterPlot
 
 import math
@@ -42,11 +42,11 @@ class MultiHistogram(Diagram):
         rows = []  # For speed, instead of appending to a dataframe, make a list of rows as dicts. https://stackoverflow.com/a/17496530/9352077
         for name, x_values in self.data.items():
             for v in x_values:
-                rows.append({"value": v, LEGEND_TITLE_CLASS: name})
+                rows.append({"value": v, DEFAULTS.LEGEND_TITLE_CLASS: name})
         df = pd.DataFrame(rows)
-        return df if len(self.data) != 1 else df.drop(columns=[LEGEND_TITLE_CLASS])
+        return df if len(self.data) != 1 else df.drop(columns=[DEFAULTS.LEGEND_TITLE_CLASS])
 
-    def commit(self, width: float, x_label="", y_label="", aspect_ratio=DEFAULT_ASPECT_RATIO):
+    def commit(self, width: float, x_label="", y_label="", aspect_ratio=None):
         with ProtectedData(self):
             fig, main_ax = newFigAx(aspect_ratio)
             for name,x_values in self.data.items():
@@ -61,7 +61,7 @@ class MultiHistogram(Diagram):
 
     def commit_histplot(self, binwidth: float=1, log_x=False, log_y=False,
                         relative_counts: bool=False, average_over_bin: bool=False,
-                        x_lims: Tuple[int,int]=None, aspect_ratio=DEFAULT_ASPECT_RATIO,
+                        x_lims: Tuple[int,int]=None, aspect_ratio=None,
                         x_tickspacing: float=1, y_tickspacing: float=None, center_ticks=False,
                         do_kde=True, kde_smoothing=True,
                         border_colour=None, fill_colour=None, do_hatch=False, # Note: colour=None means "use default colour", not "use no colour".
@@ -88,8 +88,8 @@ class MultiHistogram(Diagram):
 
             df = self.toDataframe()
             if len(self.data) != 1:
-                legend_title = LEGEND_TITLE_CLASS
-                # print(df.groupby(LEGEND_TITLE_CLASS).describe())
+                legend_title = DEFAULTS.LEGEND_TITLE_CLASS
+                # print(df.groupby(DEFAULTS.LEGEND_TITLE_CLASS).describe())
             else:
                 legend_title = None
                 # print(df.value_counts())
@@ -150,11 +150,11 @@ class MultiHistogram(Diagram):
 
             # ax.set_yticklabels(np.arange(0, max(self.x_values), ytickspacing, dtype=int))  # Don't do this. It literally overwrites existing ticks, rather than placing more of them, so the result is mathematically wrong.
             ax.set_axisbelow(True)
-            ax.grid(True, axis="y", linewidth=DEFAULT_GRIDWIDTH)
+            ax.grid(True, axis="y", linewidth=DEFAULTS.GRIDWIDTH)
             self.exportToPdf(fig, stem_suffix="_histplot")
 
     def commit_boxplot(self, value_axis_label: str= "", class_axis_label: str= "",
-                       aspect_ratio=DEFAULT_ASPECT_RATIO,
+                       aspect_ratio=None,
                        log=False, horizontal=False, iqr_limit=1.5,
                        value_tickspacing=None):
         """
@@ -169,11 +169,11 @@ class MultiHistogram(Diagram):
             for name, x_values in self.data.items():
                 for v in x_values:
                     if log:
-                        rows.append({"value": np.log10(v), LEGEND_TITLE_CLASS: name})
+                        rows.append({"value": np.log10(v), DEFAULTS.LEGEND_TITLE_CLASS: name})
                     else:
-                        rows.append({"value": v, LEGEND_TITLE_CLASS: name})
+                        rows.append({"value": v, DEFAULTS.LEGEND_TITLE_CLASS: name})
             df = pd.DataFrame(rows)
-            print(df.groupby(LEGEND_TITLE_CLASS).describe())
+            print(df.groupby(DEFAULTS.LEGEND_TITLE_CLASS).describe())
 
             fig, ax = newFigAx(aspect_ratio)
             ax: plt.Axes
@@ -190,12 +190,12 @@ class MultiHistogram(Diagram):
                 value_axis_label = "$\log_{10}($" + value_axis_label + "$)$"
 
             if horizontal:
-                sns.boxplot(df, x="value", y=LEGEND_TITLE_CLASS,
+                sns.boxplot(df, x="value", y=DEFAULTS.LEGEND_TITLE_CLASS,
                             ax=ax, linewidth=0.5, flierprops=flierprops)
                 ax.set_xlabel(value_axis_label)
                 ax.set_ylabel(class_axis_label)
             else:
-                sns.boxplot(df, x=LEGEND_TITLE_CLASS, y="value",
+                sns.boxplot(df, x=DEFAULTS.LEGEND_TITLE_CLASS, y="value",
                             ax=ax, linewidth=0.5, flierprops=flierprops,
                             whis=iqr_limit)
                 ax.set_xlabel(class_axis_label)
@@ -232,7 +232,7 @@ class Histogram(MultiHistogram):
     def addMany(self, values: Sequence[float]):
         super().addMany("x_values", values)
 
-    def commit_boxplot(self, x_label="", aspect_ratio=DEFAULT_ASPECT_RATIO):
+    def commit_boxplot(self, x_label="", aspect_ratio=None):
         fig, ax = newFigAx(aspect_ratio)
         df = self.toDataframe()
 
@@ -242,7 +242,7 @@ class Histogram(MultiHistogram):
         ax.set_yticklabels([""])
         self.exportToPdf(fig, stem_suffix="_boxplot")
 
-    def commit_violin(self, x_label="", y_label="", aspect_ratio=DEFAULT_ASPECT_RATIO):
+    def commit_violin(self, x_label="", y_label="", aspect_ratio=None):
         fig, ax = newFigAx(aspect_ratio)
         df = self.toDataframe()
 

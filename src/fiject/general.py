@@ -1,6 +1,6 @@
 # --- Imports needed by basically every file ---
 from pathlib import Path
-from typing import Union, Sequence, Tuple, List, Dict, Callable, Iterable
+from typing import Union, Sequence, Tuple, List, Dict, Callable, Iterable, Optional
 from enum import Enum
 from abc import ABC, abstractmethod
 
@@ -10,36 +10,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # --- Globally used variables ---
-# Colours
-from matplotlib import colors as mcolors
-MPL_COLORS = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
-NICE_COLORS = [
-    MPL_COLORS.get("r"), MPL_COLORS.get("g"), MPL_COLORS.get("b"),
-    MPL_COLORS.get("lime"), MPL_COLORS.get("darkviolet"), MPL_COLORS.get("gold"),
-    MPL_COLORS.get("cyan"), MPL_COLORS.get("magenta")
-]
-def getColours():
-    return list(NICE_COLORS)
-
-# Graphical defaults
-ASPECT_RATIO_SIZEUP = 1.5  # Make this LARGER to make fonts and lines SMALLER.
-DEFAULT_ASPECT_RATIO = (4,3)
-DEFAULT_GRIDWIDTH = 0.5
-
-# Strings that appear in graphs (change these to the language of choice)
-LEGEND_TITLE_CLASS = "class"
-
-# Path setup (FIXME: you'll likely want to change the first path to something suitable)
-PATH_DATA_OUT = Path(__file__).resolve().parent / "out"
-PATH_DATA_OUT.mkdir(exist_ok=True)
-PATH_FIGURES = PATH_DATA_OUT / "figures"
-PATH_FIGURES.mkdir(exist_ok=True)
-PATH_RAW = PATH_FIGURES / "raw"
-PATH_RAW.mkdir(exist_ok=True)
+from .defaults import DEFAULTS, getColours
 
 
-def newFigAx(aspect_ratio: Tuple[float,float]) -> Tuple[plt.Figure, plt.Axes]:
-    return plt.subplots(figsize=(ASPECT_RATIO_SIZEUP*aspect_ratio[0], ASPECT_RATIO_SIZEUP*aspect_ratio[1]))
+def newFigAx(aspect_ratio: Optional[Tuple[float,float]]) -> Tuple[plt.Figure, plt.Axes]:
+    if aspect_ratio is None:
+        aspect_ratio = DEFAULTS.ASPECT_RATIO
+    return plt.subplots(figsize=(DEFAULTS.ASPECT_RATIO_SIZEUP*aspect_ratio[0], DEFAULTS.ASPECT_RATIO_SIZEUP*aspect_ratio[1]))
 
 
 class PathHandling:
@@ -70,6 +47,18 @@ class PathHandling:
         if safe_modifier == 0:
             return None
         return PathHandling.makePath(folder, stem, safe_modifier-1, suffix)
+
+    @staticmethod
+    def getRawFolder():
+        raw = DEFAULTS.OUTPUT_DIRECTORY / "fiject" / "raw"
+        raw.mkdir(parents=True, exist_ok=True)
+        return raw
+
+    @staticmethod
+    def getProductionFolder():
+        prod = DEFAULTS.OUTPUT_DIRECTORY / "fiject" / "final"
+        prod.mkdir(parents=True, exist_ok=True)
+        return prod
 
 
 class CacheMode(Enum):
@@ -132,7 +121,7 @@ class Diagram(ABC):
             already_exists = False
 
             # Find file, and if you find it, try to load from it.
-            cache_path = PathHandling.getHighestAlias(PATH_RAW, self.name, ".json")
+            cache_path = PathHandling.getHighestAlias(PathHandling.getRawFolder(), self.name, ".json")
             if cache_path is not None:  # Possible cache hit
                 try:
                     self.load(cache_path)
@@ -156,7 +145,7 @@ class Diagram(ABC):
         if show:
             plt.show()  # Somtimes matplotlib hangs on savefig, and showing the figure can "slap the TV" to get it to work.
         print(f"Writing figure {stem} ...")
-        figure.savefig(PathHandling.getSafePath(PATH_FIGURES, stem, suffix).as_posix(), bbox_inches='tight')
+        figure.savefig(PathHandling.getSafePath(PathHandling.getProductionFolder(), stem, suffix).as_posix(), bbox_inches='tight')
 
     @staticmethod
     def safeDatapointWrite(stem: str, data: dict):
@@ -164,7 +153,7 @@ class Diagram(ABC):
         Write a json of data points to a file. Also safe.
         """
         print(f"Writing json {stem} ...")
-        with open(PathHandling.getSafePath(PATH_RAW, stem, ".json"), "w") as file:
+        with open(PathHandling.getSafePath(PathHandling.getRawFolder(), stem, ".json"), "w") as file:
             json.dump(data, file)
 
     ### IMPLEMENTATIONS

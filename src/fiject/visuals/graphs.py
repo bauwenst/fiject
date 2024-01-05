@@ -1,4 +1,4 @@
-from .general import *
+from ..general import *
 
 import itertools
 
@@ -41,9 +41,9 @@ class LineGraph(Diagram):
         self.data[series_name][0].extend(xs)
         self.data[series_name][1].extend(ys)
 
-    def commit(self, aspect_ratio=DEFAULT_ASPECT_RATIO, x_label="", y_label="", legend_position="lower right",
+    def commit(self, aspect_ratio=None, x_label="", y_label="", legend_position="lower right",
                do_points=True, initial_style_idx=0,
-               grid_linewidth=DEFAULT_GRIDWIDTH, curve_linewidth=1, optional_line_at_y=None,
+               grid_linewidth=None, curve_linewidth=1, optional_line_at_y=None,
                y_lims=None, x_tickspacing=None, y_tickspacing=None, logx=False, logy=False,
                only_for_return=False, existing_figax: tuple=None):
         """
@@ -70,7 +70,7 @@ class LineGraph(Diagram):
                 fig, main_ax = newFigAx(aspect_ratio)
             else:
                 fig, main_ax = existing_figax
-            main_ax.grid(True, which='both', linewidth=grid_linewidth)
+            main_ax.grid(True, which='both', linewidth=grid_linewidth if grid_linewidth is not None else DEFAULTS.GRIDWIDTH)
             main_ax.axhline(y=0, color='k', lw=0.5)
 
             style_idx = initial_style_idx
@@ -199,7 +199,7 @@ class MergedLineGraph(Diagram):
         if self.name != self.makeName():
             raise ValueError("Graph names corrupted: found", self.g1.name, "and", self.g2.name, "for merge", self.name)
 
-    def commit(self, aspect_ratio=DEFAULT_ASPECT_RATIO, x_label="", y_label_left="", y_label_right=""):
+    def commit(self, aspect_ratio=None, x_label="", y_label_left="", y_label_right=""):
         with ProtectedData(self):
             ######## ALREADY IN .COMMIT
             # First graph
