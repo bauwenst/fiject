@@ -1,11 +1,12 @@
-from typing import Tuple
+from typing import Tuple, Iterator
 from pathlib import Path
 from dataclasses import dataclass
 import os
+import itertools
 
 
 @dataclass
-class Defaults:
+class FijectDefaults:
     # Graphical defaults
     ASPECT_RATIO_SIZEUP: float
     ASPECT_RATIO: Tuple[float, float]
@@ -18,7 +19,7 @@ class Defaults:
     OUTPUT_DIRECTORY: Path
 
 
-DEFAULTS = Defaults(
+FIJECT_DEFAULTS = FijectDefaults(
     ASPECT_RATIO_SIZEUP=1.5,  # Make this LARGER to make fonts and lines SMALLER.
     ASPECT_RATIO=(4,3),
     GRIDWIDTH=0.5,
@@ -29,14 +30,14 @@ DEFAULTS = Defaults(
 )
 
 
-def setAllDefaults(d: Defaults):
+def setFijectDefaults(d: FijectDefaults):
     # Inspired by logging.setLoggerClass().
-    global DEFAULTS
-    DEFAULTS = d
+    global FIJECT_DEFAULTS
+    FIJECT_DEFAULTS = d
 
 
-def setOutputFolder(folder_path: Path):
-    DEFAULTS.OUTPUT_DIRECTORY = folder_path
+def setFijectOutputFolder(folder_path: Path):
+    FIJECT_DEFAULTS.OUTPUT_DIRECTORY = folder_path
 
 
 # Colours
@@ -47,5 +48,14 @@ NICE_COLORS = [
     MPL_COLORS.get("lime"), MPL_COLORS.get("darkviolet"), MPL_COLORS.get("gold"),
     MPL_COLORS.get("cyan"), MPL_COLORS.get("magenta")
 ]
-def getColours():
+
+def niceColours() -> list:  # Can be popped from
     return list(NICE_COLORS)
+
+def cycleNiceColours() -> Iterator:  # Can be iterated repeatedly
+    return itertools.cycle(NICE_COLORS)
+
+import matplotlib.pyplot as plt
+import numpy as np
+def cycleRainbowColours(amount_of_points: int) -> Iterator:
+    return itertools.cycle(plt.cm.rainbow(np.linspace(0, 1, amount_of_points)))  # TODO: "gist_rainbow" and "jet" are both superior, and "hsv" is cyclic.

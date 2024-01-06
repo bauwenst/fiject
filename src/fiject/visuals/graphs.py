@@ -61,21 +61,22 @@ class LineGraph(Diagram):
             #   - ...
             #   - red solid x, blue solid x, green solid x
             #   - ...
-            colours = getColours()
+            colours = niceColours()
             line_styles = ["-", "--", ":"]
             line_markers = [".", "x", "+"] if do_points else [""]
-            line_styles = list(itertools.product(line_markers, line_styles, colours))
+            line_styles = itertools.cycle(itertools.product(line_markers, line_styles, colours))  # Note: itertools.product consumes its arguments, which is why you can't use an infinite cycle for it.
+            for _ in range(initial_style_idx):
+                next(line_styles)  # Advance the styles by the given amount (0 by default)
 
             if existing_figax is None:
                 fig, main_ax = newFigAx(aspect_ratio)
             else:
                 fig, main_ax = existing_figax
-            main_ax.grid(True, which='both', linewidth=grid_linewidth if grid_linewidth is not None else DEFAULTS.GRIDWIDTH)
+            main_ax.grid(True, which='both', linewidth=grid_linewidth if grid_linewidth is not None else FIJECT_DEFAULTS.GRIDWIDTH)
             main_ax.axhline(y=0, color='k', lw=0.5)
 
-            style_idx = initial_style_idx
             for name, samples in self.data.items():
-                marker, line, colour = line_styles[style_idx % len(line_styles)]
+                marker, line, colour = next(line_styles)
                 style = marker + line
 
                 if logx and logy:
@@ -86,8 +87,6 @@ class LineGraph(Diagram):
                     main_ax.semilogy(samples[0], samples[1], style, c=colour, label=name, linewidth=curve_linewidth)
                 else:
                     main_ax.plot(samples[0], samples[1], style, c=colour, label=name, linewidth=curve_linewidth)
-
-                style_idx += 1
 
             if optional_line_at_y is not None:
                 main_ax.hlines(optional_line_at_y,
@@ -203,13 +202,13 @@ class MergedLineGraph(Diagram):
         with ProtectedData(self):
             ######## ALREADY IN .COMMIT
             # First graph
-            colours = getColours()
+            colours = cycleNiceColours()
             fig, ax1 = newFigAx(aspect_ratio)
             ax1.grid(True, which='both')
             ax1.axhline(y=0, color='k', lw=0.5)
 
             for name, samples in self.g1.data.items():
-                ax1.plot(samples[0], samples[1], c=colours.pop(0), marker=".", linestyle="-", label=name)
+                ax1.plot(samples[0], samples[1], c=next(colours), marker=".", linestyle="-", label=name)
             ########
 
             # Second graph
@@ -217,7 +216,7 @@ class MergedLineGraph(Diagram):
 
             ######## ALREADY IN .COMMIT
             for name, samples in self.g2.data.items():
-                ax2.plot(samples[0], samples[1], c=colours.pop(0), marker=".", linestyle="-", label=name)
+                ax2.plot(samples[0], samples[1], c=next(colours), marker=".", linestyle="-", label=name)
 
             # Labels
             if x_label:

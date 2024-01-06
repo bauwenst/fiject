@@ -34,11 +34,11 @@ class Bars(Diagram):
             fig, main_ax = newFigAx(aspect_ratio)
             main_ax: plt.Axes
 
-            colours = getColours()
+            colours = cycleNiceColours()
             group_locations = None
             for i, (bar_slice_family, slice_heights) in enumerate(self.data.items()):
                 group_locations = group_spacing * np.arange(len(slice_heights))
-                main_ax.bar(group_locations + bar_width*i, slice_heights, color=colours.pop(0), width=bar_width,
+                main_ax.bar(group_locations + bar_width*i, slice_heights, color=next(colours), width=bar_width,
                             label=bar_slice_family)
 
             # X-axis
@@ -54,7 +54,7 @@ class Bars(Diagram):
 
             # Grid
             main_ax.set_axisbelow(True)  # Put grid behind the bars.
-            main_ax.grid(True, axis="y", linewidth=DEFAULTS.GRIDWIDTH)
+            main_ax.grid(True, axis="y", linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
             main_ax.legend()
 
             self.exportToPdf(fig)

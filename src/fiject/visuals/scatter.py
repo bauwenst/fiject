@@ -26,9 +26,11 @@ class ScatterPlot(Diagram):
         self.data[family_name][0].extend(xs)
         self.data[family_name][1].extend(ys)
 
-    def commit(self, aspect_ratio: Tuple[float,float]=None, x_label="", y_label="", legend=False,
+    def commit(self, aspect_ratio: Tuple[float,float]=None,
+               x_label="", y_label="", legend=False,
                x_lims=None, y_lims=None, logx=False, logy=False, x_tickspacing=None, y_tickspacing=None, grid=False,
-               family_colours=None, family_sizes=None, randomise_markers=False, only_for_return=False):
+               family_colours=None, family_sizes=None, default_size: int=35, do_rainbow_defaults: bool=False,
+               randomise_markers=False, only_for_return=False):
         with ProtectedData(self):
             fig, ax = newFigAx(aspect_ratio)
             ax: plt.Axes
@@ -38,8 +40,8 @@ class ScatterPlot(Diagram):
                 ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999))  # See comment under https://stackoverflow.com/q/76285293/9352077
                 ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation())
             elif x_tickspacing:
-                    ax.xaxis.set_major_locator(tkr.MultipleLocator(x_tickspacing))
-                    ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
+                ax.xaxis.set_major_locator(tkr.MultipleLocator(x_tickspacing))
+                ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
 
             if logy:
                 ax.set_yscale("log")
@@ -58,16 +60,14 @@ class ScatterPlot(Diagram):
                 family_sizes = dict()
 
             markers = {".", "^", "+", "s"}
-            # cols = getColours()
-            cols = plt.cm.rainbow(np.linspace(0, 1, len(self.data)))  # Equally spaced rainbow colours.
+            cols = cycleRainbowColours(len(self.data)) if do_rainbow_defaults else cycleNiceColours()
             scatters = []
             names    = []
-            for idx, tup in enumerate(sorted(self.data.items(), reverse=True)):
-                name, family = tup
-                m = markers.pop() if randomise_markers else "."
-                c = family_colours.get(name, cols[idx])
-                s = family_sizes.get(name, 35)
-                result = ax.scatter(family[0], family[1], marker=m, linewidths=0.05, color=c, s=s)
+            for name, family in sorted(self.data.items(), reverse=True):
+                marker = markers.pop() if randomise_markers else "."
+                colour = family_colours[name] if name in family_colours else next(cols)  # Not using .get because then next() is called.
+                size   = family_sizes.get(name, default_size)
+                result = ax.scatter(family[0], family[1], marker=marker, linewidths=0.05, color=colour, s=size)
                 scatters.append(result)
                 names.append(name)
 
@@ -83,7 +83,7 @@ class ScatterPlot(Diagram):
 
             if grid:
                 ax.set_axisbelow(True)
-                ax.grid(True, linewidth=DEFAULTS.GRIDWIDTH)
+                ax.grid(True, linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
 
             if legend:
                 ax.legend(scatters, names, loc='upper left', markerscale=10, ncol=2)  # https://stackoverflow.com/questions/17411940/matplotlib-scatter-plot-legend

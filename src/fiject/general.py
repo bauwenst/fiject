@@ -10,13 +10,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # --- Globally used variables ---
-from .defaults import DEFAULTS, getColours
+from .defaults import FIJECT_DEFAULTS, niceColours, cycleNiceColours, cycleRainbowColours
 
 
 def newFigAx(aspect_ratio: Optional[Tuple[float,float]]) -> Tuple[plt.Figure, plt.Axes]:
     if aspect_ratio is None:
-        aspect_ratio = DEFAULTS.ASPECT_RATIO
-    return plt.subplots(figsize=(DEFAULTS.ASPECT_RATIO_SIZEUP*aspect_ratio[0], DEFAULTS.ASPECT_RATIO_SIZEUP*aspect_ratio[1]))
+        aspect_ratio = FIJECT_DEFAULTS.ASPECT_RATIO
+    return plt.subplots(figsize=(FIJECT_DEFAULTS.ASPECT_RATIO_SIZEUP * aspect_ratio[0], FIJECT_DEFAULTS.ASPECT_RATIO_SIZEUP * aspect_ratio[1]))
 
 
 class PathHandling:
@@ -50,13 +50,13 @@ class PathHandling:
 
     @staticmethod
     def getRawFolder():
-        raw = DEFAULTS.OUTPUT_DIRECTORY / "fiject" / "raw"
+        raw = FIJECT_DEFAULTS.OUTPUT_DIRECTORY / "fiject" / "raw"
         raw.mkdir(parents=True, exist_ok=True)
         return raw
 
     @staticmethod
     def getProductionFolder():
-        prod = DEFAULTS.OUTPUT_DIRECTORY / "fiject" / "final"
+        prod = FIJECT_DEFAULTS.OUTPUT_DIRECTORY / "fiject" / "final"
         prod.mkdir(parents=True, exist_ok=True)
         return prod
 

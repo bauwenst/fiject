@@ -42,9 +42,9 @@ class MultiHistogram(Diagram):
         rows = []  # For speed, instead of appending to a dataframe, make a list of rows as dicts. https://stackoverflow.com/a/17496530/9352077
         for name, x_values in self.data.items():
             for v in x_values:
-                rows.append({"value": v, DEFAULTS.LEGEND_TITLE_CLASS: name})
+                rows.append({"value": v, FIJECT_DEFAULTS.LEGEND_TITLE_CLASS: name})
         df = pd.DataFrame(rows)
-        return df if len(self.data) != 1 else df.drop(columns=[DEFAULTS.LEGEND_TITLE_CLASS])
+        return df if len(self.data) != 1 else df.drop(columns=[FIJECT_DEFAULTS.LEGEND_TITLE_CLASS])
 
     def commit(self, width: float, x_label="", y_label="", aspect_ratio=None):
         with ProtectedData(self):
@@ -88,7 +88,7 @@ class MultiHistogram(Diagram):
 
             df = self.toDataframe()
             if len(self.data) != 1:
-                legend_title = DEFAULTS.LEGEND_TITLE_CLASS
+                legend_title = FIJECT_DEFAULTS.LEGEND_TITLE_CLASS
                 # print(df.groupby(DEFAULTS.LEGEND_TITLE_CLASS).describe())
             else:
                 legend_title = None
@@ -150,7 +150,7 @@ class MultiHistogram(Diagram):
 
             # ax.set_yticklabels(np.arange(0, max(self.x_values), ytickspacing, dtype=int))  # Don't do this. It literally overwrites existing ticks, rather than placing more of them, so the result is mathematically wrong.
             ax.set_axisbelow(True)
-            ax.grid(True, axis="y", linewidth=DEFAULTS.GRIDWIDTH)
+            ax.grid(True, axis="y", linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
             self.exportToPdf(fig, stem_suffix="_histplot")
 
     def commit_boxplot(self, value_axis_label: str= "", class_axis_label: str= "",
@@ -169,11 +169,11 @@ class MultiHistogram(Diagram):
             for name, x_values in self.data.items():
                 for v in x_values:
                     if log:
-                        rows.append({"value": np.log10(v), DEFAULTS.LEGEND_TITLE_CLASS: name})
+                        rows.append({"value": np.log10(v), FIJECT_DEFAULTS.LEGEND_TITLE_CLASS: name})
                     else:
-                        rows.append({"value": v, DEFAULTS.LEGEND_TITLE_CLASS: name})
+                        rows.append({"value": v, FIJECT_DEFAULTS.LEGEND_TITLE_CLASS: name})
             df = pd.DataFrame(rows)
-            print(df.groupby(DEFAULTS.LEGEND_TITLE_CLASS).describe())
+            print(df.groupby(FIJECT_DEFAULTS.LEGEND_TITLE_CLASS).describe())
 
             fig, ax = newFigAx(aspect_ratio)
             ax: plt.Axes
@@ -190,12 +190,12 @@ class MultiHistogram(Diagram):
                 value_axis_label = "$\log_{10}($" + value_axis_label + "$)$"
 
             if horizontal:
-                sns.boxplot(df, x="value", y=DEFAULTS.LEGEND_TITLE_CLASS,
+                sns.boxplot(df, x="value", y=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS,
                             ax=ax, linewidth=0.5, flierprops=flierprops)
                 ax.set_xlabel(value_axis_label)
                 ax.set_ylabel(class_axis_label)
             else:
-                sns.boxplot(df, x=DEFAULTS.LEGEND_TITLE_CLASS, y="value",
+                sns.boxplot(df, x=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS, y="value",
                             ax=ax, linewidth=0.5, flierprops=flierprops,
                             whis=iqr_limit)
                 ax.set_xlabel(class_axis_label)

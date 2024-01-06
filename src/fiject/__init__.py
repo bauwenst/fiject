@@ -7,8 +7,8 @@ from .visuals.scatter import ScatterPlot
 __all__ = ["LineGraph", "MergedLineGraph", "Bars", "ScatterPlot", "MultiHistogram", "Histogram", "CacheMode"]  # What will be imported by 'from fiject import *'
 
 
-# Configuration stuff that you should access as "import fiject; fiject.setOutputFolder(...)"
-from .defaults import setOutputFolder, setAllDefaults, DEFAULTS, Defaults
+# Configuration stuff that you should access as "import fiject; fiject.setFijectOutputFolder(...)"
+from .defaults import setFijectOutputFolder, setFijectDefaults, FIJECT_DEFAULTS, FijectDefaults
 
 
 # --- Global font setup (applied even if a file never imports general.py) ---
