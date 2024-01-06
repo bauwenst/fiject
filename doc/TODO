@@ -6,5 +6,3 @@ TODO:
          - Should be easy to drop rows (possibly you should be able to do this before committing though) to get a reduced table
          - Align &s
          - Deltas should be able to be coloured. That's a LaTeX issue, though.
-    - If people are going to be using this script as a library, they need a way to set up the output path (and the scale too, while we're at it).
-      Probably do it like logging does it.

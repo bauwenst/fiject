@@ -433,3 +433,38 @@ class Table(Diagram):
                 file.write("\n".join(lines))
 
             lprint(lines)
+
+    @staticmethod
+    def getLaTeXpreamble() -> str:
+        return r"""
+        \usepackage{multirow}
+        \usepackage[table]{xcolor}
+        \usepackage{arydshln}
+        \usepackage{hhline}  % There's a fatal flaw in arydshln's partial table lines, \cline and \cdashline, namely that they don't move cells down to make a gap into which to insert their line, unlike \hline. As a result, coloured cells cover those lines (see https://tex.stackexchange.com/a/603623/203081). A solution is using \hhline syntax (https://tex.stackexchange.com/a/121477/203081).
+        
+        \usepackage{etoolbox}
+        \usepackage{pgf}
+        
+        % Definitions
+        \newcommand*{\MinNumber}{0.0}%
+        \newcommand*{\MidNumber}{0.50} %
+        \newcommand*{\MaxNumber}{1.0}%
+        
+        \definecolor{high}{HTML}{03AC13}
+        \definecolor{mid}{HTML}{F7E379}
+        \definecolor{low}{HTML}{ec462e}
+        \newcommand*{\opacity}{80}
+        
+        % Cell command
+        \newcommand{\tgrad}[1]{%
+            \ifdim #1 pt > \MidNumber pt%
+                \pgfmathparse{max(min(100.0*(#1 - \MidNumber)/(\MaxNumber-\MidNumber),100.0),0)}%
+                \xdef\PercentColor{\pgfmathresult}%
+                \cellcolor{high!\PercentColor!mid!\opacity}#1%
+            \else
+                \pgfmathparse{max(min(100.0*(\MidNumber - #1)/(\MidNumber-\MinNumber),100.0),0)}%
+                \xdef\PercentColor{\pgfmathresult}%
+                \cellcolor{low!\PercentColor!mid!\opacity}#1%
+            \fi
+        }
+        """
