@@ -26,14 +26,23 @@ class ScatterPlot(Diagram):
         self.data[family_name][0].extend(xs)
         self.data[family_name][1].extend(ys)
 
+    def precommit(self) -> Dict[str,Tuple[List[float],List[float]]]:
+        """
+        Return a transformed version of the dataset before committing.
+        """
+        return self.data
+
     def commit(self, aspect_ratio: Tuple[float,float]=None,
-               x_label="", y_label="", legend=False,
-               x_lims=None, y_lims=None, logx=False, logy=False, x_tickspacing=None, y_tickspacing=None, grid=False,
+               x_label: str="", y_label: str="", legend=False,
+               x_lims: Tuple[int,int]=None, y_lims: Tuple[int,int]=None, logx=False, logy=False, x_tickspacing=None, y_tickspacing=None, 
+               grid_x=False, grid_y=False,
                family_colours=None, family_sizes=None, default_size: int=35, do_rainbow_defaults: bool=False,
                randomise_markers=False, only_for_return=False):
         with ProtectedData(self):
             fig, ax = newFigAx(aspect_ratio)
             ax: plt.Axes
+
+            data = self.precommit()
 
             if logx:
                 ax.set_xscale("log")  # Needed for a log scatterplot. https://stackoverflow.com/a/52573929/9352077
@@ -60,10 +69,10 @@ class ScatterPlot(Diagram):
                 family_sizes = dict()
 
             markers = {".", "^", "+", "s"}
-            cols = cycleRainbowColours(len(self.data)) if do_rainbow_defaults else cycleNiceColours()
+            cols = cycleRainbowColours(len(data)) if do_rainbow_defaults else cycleNiceColours()
             scatters = []
             names    = []
-            for name, family in sorted(self.data.items(), reverse=True):
+            for name, family in sorted(data.items(), reverse=True):
                 marker = markers.pop() if randomise_markers else "."
                 colour = family_colours[name] if name in family_colours else next(cols)  # Not using .get because then next() is called.
                 size   = family_sizes.get(name, default_size)
@@ -81,9 +90,10 @@ class ScatterPlot(Diagram):
             if y_label:
                 ax.set_ylabel(y_label)
 
-            if grid:
+            if grid_x or grid_y:
                 ax.set_axisbelow(True)
-                ax.grid(True, linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
+                ax.grid(axis="x" if grid_x and not grid_y else "y" if grid_y and not grid_x else "both",
+                        linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
 
             if legend:
                 ax.legend(scatters, names, loc='upper left', markerscale=10, ncol=2)  # https://stackoverflow.com/questions/17411940/matplotlib-scatter-plot-legend
@@ -91,3 +101,27 @@ class ScatterPlot(Diagram):
             if not only_for_return:
                 self.exportToPdf(fig)
             return fig, ax
+
+
+class ScatterPlot_DiscreteContinuous(ScatterPlot):
+    """
+    Scatterplot (i.e. visual of bivariate non-functional data), but the first variable is assumed to be discrete
+    (and specifically, to have INTEGER values, a special kind of discrete).
+
+    With N discrete values, that means any pair of points has 1/N chance of matching exactly in one of the coordinate
+    dimensions, and if their other coordinate follows any kind of distribution, they have a good chance of overlapping
+    there too.
+
+    Hence, we jitter around the discrete values to keep them visually discrete, but have less overlap probability.
+    """
+
+    def precommit(self) -> Dict[str,Tuple[List[float],List[float]]]:
+        import numpy.random as npr
+        MAX_JITTER = 0.25   # Due to the assumed integer spacing of the x values, this means you have an equal amount of air as you will bar between each number (0.25 bar 1, 0.5 air, 0.25 bar 2, 0.25 bar 2, 0.5 air, 0.25 bar 3 ...)
+
+        jittered_data = dict()
+        for family, (xs, ys) in self.data.items():
+            new_xs = [x + MAX_JITTER * (2*(npr.rand()-0.5)) for x in xs]
+            jittered_data[family] = (new_xs, ys)
+
+        return jittered_data

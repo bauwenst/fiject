@@ -61,7 +61,7 @@ class MultiHistogram(Diagram):
 
     def commit_histplot(self, binwidth: float=1, log_x=False, log_y=False,
                         relative_counts: bool=False, average_over_bin: bool=False,
-                        x_lims: Tuple[int,int]=None, aspect_ratio=None,
+                        x_lims: Tuple[Optional[int],Optional[int]]=None, aspect_ratio=None,
                         x_tickspacing: float=1, y_tickspacing: float=None, center_ticks=False,
                         do_kde=True, kde_smoothing=True,
                         border_colour=None, fill_colour=None, do_hatch=False, # Note: colour=None means "use default colour", not "use no colour".
