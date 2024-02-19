@@ -1,13 +1,13 @@
 from .general import CacheMode
 from .visuals.graphs import LineGraph, MergedLineGraph
 from .visuals.histos import MultiHistogram, Histogram
-from .visuals.bars import Bars
+from .visuals.bars import Bars, HistoBars
 from .visuals.scatter import ScatterPlot, ScatterPlot_DiscreteContinuous
 from .visuals.tables import Table, ColumnStyle
 from .defaults import setFijectOutputFolder, setFijectDefaults, FIJECT_DEFAULTS, FijectDefaults
 
 __all__ = ["LineGraph", "MergedLineGraph",
-           "Bars",
+           "Bars", "HistoBars",
            "ScatterPlot", "ScatterPlot_DiscreteContinuous",
            "MultiHistogram", "Histogram",
            "Table", "ColumnStyle",
