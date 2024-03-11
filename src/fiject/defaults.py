@@ -30,10 +30,10 @@ FIJECT_DEFAULTS = FijectDefaults(
 )
 
 
-def setFijectDefaults(d: FijectDefaults):
-    # Inspired by logging.setLoggerClass().
-    global FIJECT_DEFAULTS
-    FIJECT_DEFAULTS = d
+# def setFijectDefaults(d: FijectDefaults):  # Actually, it is a bad idea to have if you import FIJECT_DEFAULTS. After a file has imported FIJECT_DEFAULTS, that variable name will, in that file, always be bound to the object reference at that moment. Changing the object reference here won't do anything there. The only way to solve this is to have a function getFijectDefaults() to be imported instead.
+#     # Inspired by logging.setLoggerClass().
+#     global FIJECT_DEFAULTS
+#     FIJECT_DEFAULTS = d
 
 
 def setFijectOutputFolder(folder_path: Path):
