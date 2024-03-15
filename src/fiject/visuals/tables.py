@@ -435,36 +435,39 @@ class Table(Diagram):
             lprint(lines)
 
     @staticmethod
-    def getLaTeXpreamble() -> str:
+    def getLaTeXpreamble(include_cellgradients: bool=False) -> str:
+        """
+        :param include_cellgradients: includes code that defines a "table gradient" (tgrad) macro, which, when put
+                                      around a number in a table cell, will colour that cell using a gradient.
+        """
         return r"""
         \usepackage{multirow}
         \usepackage[table]{xcolor}
         \usepackage{arydshln}
         \usepackage{hhline}  % There's a fatal flaw in arydshln's partial table lines, \cline and \cdashline, namely that they don't move cells down to make a gap into which to insert their line, unlike \hline. As a result, coloured cells cover those lines (see https://tex.stackexchange.com/a/603623/203081). A solution is using \hhline syntax (https://tex.stackexchange.com/a/121477/203081).
-        
+        """ + \
+        include_cellgradients*\
+        r"""
         \usepackage{etoolbox}
         \usepackage{pgf}
+        \usepackage{xargs}
         
-        % Definitions
-        \newcommand*{\MinNumber}{0.0}%
-        \newcommand*{\MidNumber}{0.50} %
-        \newcommand*{\MaxNumber}{1.0}%
-        
+        % Colours
         \definecolor{high}{HTML}{03AC13}
         \definecolor{mid}{HTML}{F7E379}
         \definecolor{low}{HTML}{ec462e}
         \newcommand*{\opacity}{80}
         
         % Cell command
-        \newcommand{\tgrad}[1]{%
-            \ifdim #1 pt > \MidNumber pt%
-                \pgfmathparse{max(min(100.0*(#1 - \MidNumber)/(\MaxNumber-\MidNumber),100.0),0)}%
+        \newcommandx{\tgrad}[4][1=0.0, 2=0.5, 3=1.0]{%
+            \ifdim #4 pt > #2 pt%
+                \pgfmathparse{max(min(100.0*(#4-#2)/(#3-#2),100.0),0)}%
                 \xdef\PercentColor{\pgfmathresult}%
-                \cellcolor{high!\PercentColor!mid!\opacity}#1%
+                \cellcolor{high!\PercentColor!mid!\opacity}#4%
             \else
-                \pgfmathparse{max(min(100.0*(\MidNumber - #1)/(\MidNumber-\MinNumber),100.0),0)}%
+                \pgfmathparse{max(min(100.0*(#2-#4)/(#2-#1),100.0),0)}%
                 \xdef\PercentColor{\pgfmathresult}%
-                \cellcolor{low!\PercentColor!mid!\opacity}#1%
+                \cellcolor{low!\PercentColor!mid!\opacity}#4%
             \fi
         }
         """
