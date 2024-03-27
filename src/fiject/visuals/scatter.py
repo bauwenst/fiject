@@ -40,24 +40,24 @@ class ScatterPlot(Diagram):
         aspect_ratio: Tuple[float, float] = None
         x_label: str = ""
         y_label: str = ""
-        x_lims: Tuple[int, int] = None
-        y_lims: Tuple[int, int] = None
-        logx = False
-        logy = False
-        legend = False
-        x_tickspacing = None
-        y_tickspacing = None
-        grid_x = False
-        grid_y = False
+        x_lims: Tuple[float, float] = None
+        y_lims: Tuple[float, float] = None
+        logx: bool = False
+        logy: bool = False
+        legend: bool = False
+        x_tickspacing: float = None
+        y_tickspacing: float = None
+        grid_x: bool = False
+        grid_y: bool = False
 
-        default_markers_change = False
+        default_markers_change: bool = False
         default_colours_rainbow: bool = False
 
     @dataclass
     class ArgsPerFamily:
         colour: str = None
         marker: str = None
-        size: int = 35
+        size: float = 35
 
     def commitWithArgs(self, diagram_options: ArgsGlobal, default_family_options: ArgsPerFamily, extra_family_options: Dict[str,ArgsPerFamily]=None,
                        only_for_return=False):
