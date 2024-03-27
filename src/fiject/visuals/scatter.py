@@ -1,5 +1,8 @@
 from ..general import *
 
+from dataclasses import dataclass
+import itertools
+
 import numpy as np
 import matplotlib.ticker as tkr
 
@@ -32,70 +35,91 @@ class ScatterPlot(Diagram):
         """
         return self.data
 
-    def commit(self, aspect_ratio: Tuple[float,float]=None,
-               x_label: str="", y_label: str="", legend=False,
-               x_lims: Tuple[int,int]=None, y_lims: Tuple[int,int]=None, logx=False, logy=False, x_tickspacing=None, y_tickspacing=None, 
-               grid_x=False, grid_y=False,
-               family_colours=None, family_sizes=None, default_size: int=35, do_rainbow_defaults: bool=False,
-               randomise_markers=False, only_for_return=False):
+    @dataclass
+    class ArgsGlobal:
+        aspect_ratio: Tuple[float, float] = None
+        x_label: str = ""
+        y_label: str = ""
+        x_lims: Tuple[int, int] = None
+        y_lims: Tuple[int, int] = None
+        logx = False
+        logy = False
+        legend = False
+        x_tickspacing = None
+        y_tickspacing = None
+        grid_x = False
+        grid_y = False
+
+        default_markers_change = False
+        default_colours_rainbow: bool = False
+
+    @dataclass
+    class ArgsPerFamily:
+        colour: str = None
+        marker: str = None
+        size: int = 35
+
+    def commitWithArgs(self, diagram_options: ArgsGlobal, default_family_options: ArgsPerFamily, extra_family_options: Dict[str,ArgsPerFamily]=None,
+                       only_for_return=False):
+        do = diagram_options
         with ProtectedData(self):
-            fig, ax = newFigAx(aspect_ratio)
+            if extra_family_options is None:
+                extra_family_options = dict()
+
+            fig, ax = newFigAx(do.aspect_ratio)
             ax: plt.Axes
 
             data = self.precommit()
 
-            if logx:
+            if do.logx:
                 ax.set_xscale("log")  # Needed for a log scatterplot. https://stackoverflow.com/a/52573929/9352077
                 ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999))  # See comment under https://stackoverflow.com/q/76285293/9352077
                 ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation())
-            elif x_tickspacing:
-                ax.xaxis.set_major_locator(tkr.MultipleLocator(x_tickspacing))
+            elif do.x_tickspacing:
+                ax.xaxis.set_major_locator(tkr.MultipleLocator(do.x_tickspacing))
                 ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
 
-            if logy:
+            if do.logy:
                 ax.set_yscale("log")
                 ax.yaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999))
                 ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation())
-            elif y_tickspacing:
-                ax.xaxis.set_major_locator(tkr.MultipleLocator(y_tickspacing))
+            elif do.y_tickspacing:
+                ax.xaxis.set_major_locator(tkr.MultipleLocator(do.y_tickspacing))
                 ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
 
-            if logx and logy:  # Otherwise you have a skewed view of horizontal vs. vertical distances.
+            if do.logx and do.logy:  # Otherwise you have a skewed view of horizontal vs. vertical distances.
                 ax.set_aspect("equal")
 
-            if family_colours is None:
-                family_colours = dict()
-            if family_sizes is None:
-                family_sizes = dict()
-
-            markers = {".", "^", "+", "s"}
-            cols = cycleRainbowColours(len(data)) if do_rainbow_defaults else cycleNiceColours()
+            markers = itertools.cycle([".", "^", "+", "s"]) if do.default_markers_change else itertools.cycle(["."])
+            cols    = cycleRainbowColours(len(data))        if do.default_colours_rainbow else cycleNiceColours()
             scatters = []
             names    = []
             for name, family in sorted(data.items(), reverse=True):
-                marker = markers.pop() if randomise_markers else "."
-                colour = family_colours[name] if name in family_colours else next(cols)  # Not using .get because then next() is called.
-                size   = family_sizes.get(name, default_size)
+                options = extra_family_options.get(name, default_family_options)
+
+                marker = options.marker if options.marker is not None else next(markers)
+                colour = options.colour if options.colour is not None else next(cols)
+                size   = options.size
                 result = ax.scatter(family[0], family[1], marker=marker, linewidths=0.05, color=colour, s=size)
                 scatters.append(result)
                 names.append(name)
 
-            if x_lims:
-                ax.set_xlim(x_lims[0], x_lims[1])
-            if y_lims:
-                ax.set_ylim(y_lims[0], y_lims[1])
+            if do.x_lims:
+                ax.set_xlim(do.x_lims[0], do.x_lims[1])
+            if do.y_lims:
+                ax.set_ylim(do.y_lims[0], do.y_lims[1])
 
-            if x_label:
-                ax.set_xlabel(x_label)
-            if y_label:
-                ax.set_ylabel(y_label)
+            if do.x_label:
+                ax.set_xlabel(do.x_label)
+            if do.y_label:
+                ax.set_ylabel(do.y_label)
 
-            if grid_x or grid_y:
+            if do.grid_x or do.grid_y:
                 ax.set_axisbelow(True)
-                ax.grid(axis="x" if grid_x and not grid_y else "y" if grid_y and not grid_x else "both",
+                ax.grid(axis="x" if do.grid_x and not do.grid_y else "y" if do.grid_y and not do.grid_x else "both",
                         linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
 
-            if legend:
+            if do.legend:
                 ax.legend(scatters, names, loc='upper left', markerscale=10, ncol=2)  # https://stackoverflow.com/questions/17411940/matplotlib-scatter-plot-legend
 
             if not only_for_return:

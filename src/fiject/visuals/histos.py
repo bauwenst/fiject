@@ -1,6 +1,8 @@
 from ..general import *
 from .scatter import ScatterPlot
 
+from dataclasses import dataclass
+
 import math
 import pandas as pd
 import scipy
@@ -46,18 +48,27 @@ class MultiHistogram(Diagram):
         df = pd.DataFrame(rows)
         return df if len(self.data) != 1 else df.drop(columns=[FIJECT_DEFAULTS.LEGEND_TITLE_CLASS])
 
-    def commit(self, width: float, x_label="", y_label="", aspect_ratio=None):
-        with ProtectedData(self):
-            fig, main_ax = newFigAx(aspect_ratio)
-            for name,x_values in self.data.items():
-                main_ax.hist(x_values, bins=int((max(x_values) - min(x_values)) // width))  # You could do this, but I don't think the ticks will then be easy to set.
+    @dataclass
+    class ArgsGlobal:
+        binwidth: float = 1
+        relative_counts: bool = False
+        average_over_bin: bool = False
 
-            if x_label:
-                main_ax.set_xlabel(x_label)
-            if y_label:
-                main_ax.set_ylabel(y_label)
+        do_kde = True
+        kde_smoothing = True
+        border_colour = None
+        fill_colour = None  # Note: colour=None means "use default colour", not "use no colour".
+        do_hatch = False
 
-            self.exportToPdf(fig)
+        aspect_ratio = None
+        x_lims: Tuple[Optional[int], Optional[int]] = None
+        x_label: str = ""
+        y_label: str = ""
+        log_x = False
+        log_y = False
+        x_tickspacing: float = 1
+        y_tickspacing: float = None
+        center_ticks = False
 
     def commit_histplot(self, binwidth: float=1, log_x=False, log_y=False,
                         relative_counts: bool=False, average_over_bin: bool=False,
@@ -74,14 +85,38 @@ class MultiHistogram(Diagram):
         :param center_ticks: Whether to center the ticks on the bars. The bars at the minimal and maximal x_lim are
                              only half-visible.
         """
+        self.commitWithArgs_histplot(MultiHistogram.ArgsGlobal(
+            binwidth=binwidth,
+            relative_counts=relative_counts,
+            average_over_bin=average_over_bin,
+
+            do_kde=do_kde,
+            kde_smoothing=kde_smoothing,
+            border_colour=border_colour,
+            fill_colour=fill_colour,
+            do_hatch=do_hatch,
+
+            aspect_ratio=aspect_ratio,
+            x_lims=x_lims,
+            x_label=x_label,
+            y_label=y_label,
+            log_x=log_x,
+            log_y=log_y,
+            x_tickspacing=x_tickspacing,
+            y_tickspacing=y_tickspacing,
+            center_ticks=center_ticks
+        ), **seaborn_args)
+
+    def commitWithArgs_histplot(self, diagram_options: ArgsGlobal, **seaborn_args):
+        do = diagram_options
         with ProtectedData(self):
-            if relative_counts:
-                if average_over_bin:
+            if do.relative_counts:
+                if do.average_over_bin:
                     mode = "density"  # Total area is 1.
                 else:
                     mode = "percent"  # Total area is 100.
             else:
-                if average_over_bin:
+                if do.average_over_bin:
                     mode = "frequency"
                 else:
                     mode = "count"
@@ -92,26 +127,26 @@ class MultiHistogram(Diagram):
                 # print(df.groupby(DEFAULTS.LEGEND_TITLE_CLASS).describe())
             else:
                 legend_title = None
-                # print(df.value_counts())
+                print(df.value_counts())
 
-            fig, ax = newFigAx(aspect_ratio)
-            if not log_x:
+            fig, ax = newFigAx(do.aspect_ratio)
+            if not do.log_x:
                 sns.histplot(df, ax=ax, x="value", hue=legend_title,  # x and hue args: https://seaborn.pydata.org/tutorial/distributions.html
-                             binwidth=binwidth, binrange=(math.floor(df["value"].min()/binwidth)*binwidth,
-                                                          math.ceil( df["value"].max()/binwidth)*binwidth),
-                             discrete=center_ticks, stat=mode, common_norm=False,
-                             kde=do_kde, kde_kws={"bw_adjust": 10} if kde_smoothing else seaborn_args.pop("kde_kws", None),  # Btw, do not use displot: https://stackoverflow.com/a/63895570/9352077
-                             color=fill_colour, edgecolor=border_colour,
+                             binwidth=do.binwidth, binrange=(math.floor(df["value"].min() / do.binwidth) * do.binwidth,
+                                                             math.ceil(df["value"].max() / do.binwidth) * do.binwidth),
+                             discrete=do.center_ticks, stat=mode, common_norm=False,
+                             kde=do.do_kde, kde_kws={"bw_adjust": 10} if do.kde_smoothing else seaborn_args.pop("kde_kws", None),  # Btw, do not use displot: https://stackoverflow.com/a/63895570/9352077
+                             color=do.fill_colour, edgecolor=do.border_colour,
                              **seaborn_args)  # Do note use displot: https://stackoverflow.com/a/63895570/9352077
             else:
                 sns.histplot(df, ax=ax, x="value", hue=legend_title,
                              log_scale=True,
-                             discrete=center_ticks, stat=mode, common_norm=False,
-                             color=fill_colour, edgecolor=border_colour,
+                             discrete=do.center_ticks, stat=mode, common_norm=False,
+                             color=do.fill_colour, edgecolor=do.border_colour,
                              **seaborn_args)  # Do note use displot: https://stackoverflow.com/a/63895570/9352077
 
             # Cross-hatching
-            if do_hatch:
+            if do.do_hatch:
                 # Note that this is actually quite difficult for multi-histograms: surprisingly, you can't pass all the
                 # hatch patterns you want to sns.histplot, only one. Hence, we need a hack, see
                 #   https://stackoverflow.com/a/40293705/9352077
@@ -124,26 +159,26 @@ class MultiHistogram(Diagram):
                         bar.set_hatch(pattern)
 
             # Axes
-            ax.set_xlabel(x_label)
-            ax.set_ylabel(y_label + r" [\%]" * (mode == "percent" and y_label != ""))
-            if x_lims:
-                if x_lims[0] is not None and x_lims[1] is not None:
-                    ax.set_xlim(x_lims[0], x_lims[1])
-                elif x_lims[0] is not None:
-                    ax.set_xlim(left=x_lims[0])
-                elif x_lims[1] is not None:
-                    ax.set_xlim(right=x_lims[1])
+            ax.set_xlabel(do.x_label)
+            ax.set_ylabel(do.y_label + r" [\%]" * (mode == "percent" and do.y_label != ""))
+            if do.x_lims:
+                if do.x_lims[0] is not None and do.x_lims[1] is not None:
+                    ax.set_xlim(do.x_lims[0], do.x_lims[1])
+                elif do.x_lims[0] is not None:
+                    ax.set_xlim(left=do.x_lims[0])
+                elif do.x_lims[1] is not None:
+                    ax.set_xlim(right=do.x_lims[1])
                 else:  # You passed (None,None)...
                     pass
 
             # Weird tick spacing hack that somehow works https://stackoverflow.com/a/44525175/9352077
-            if not log_x:
-                ax.xaxis.set_major_locator(tkr.MultipleLocator(x_tickspacing))
+            if not do.log_x:
+                ax.xaxis.set_major_locator(tkr.MultipleLocator(do.x_tickspacing))
                 ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
 
-            if not log_y:
-                if y_tickspacing:
-                    ax.yaxis.set_major_locator(tkr.MultipleLocator(y_tickspacing))
+            if not do.log_y:
+                if do.y_tickspacing:
+                    ax.yaxis.set_major_locator(tkr.MultipleLocator(do.y_tickspacing))
                     ax.yaxis.set_major_formatter(tkr.ScalarFormatter())
             else:
                 ax.set_yscale("log")
@@ -152,6 +187,17 @@ class MultiHistogram(Diagram):
             ax.set_axisbelow(True)
             ax.grid(True, axis="y", linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
             self.exportToPdf(fig, stem_suffix="_histplot")
+
+    @dataclass
+    class ArgsGlobal_BoxPlot:
+        iqr_limit: float=1.5
+
+        aspect_ratio: Tuple[float,float]=None
+        horizontal: bool=False
+        log: bool=False
+        value_tickspacing: float=None
+        value_axis_label: str=""
+        class_axis_label: str=""
 
     def commit_boxplot(self, value_axis_label: str= "", class_axis_label: str= "",
                        aspect_ratio=None,
@@ -164,18 +210,31 @@ class MultiHistogram(Diagram):
         boxplot. Instead, this method applies log10 to the values, then computes
         the boxplot, and plots it on a regular axis.
         """
+        self.commitWithArgs_boxplot(MultiHistogram.ArgsGlobal_BoxPlot(
+            iqr_limit=iqr_limit,
+
+            aspect_ratio=aspect_ratio,
+            horizontal=horizontal,
+            log=log,
+            value_tickspacing=value_tickspacing,
+            value_axis_label=value_axis_label,
+            class_axis_label=class_axis_label
+        ))
+
+    def commitWithArgs_boxplot(self, diagram_options: ArgsGlobal_BoxPlot):
+        do = diagram_options
         with ProtectedData(self):
             rows = []
             for name, x_values in self.data.items():
                 for v in x_values:
-                    if log:
+                    if do.log:
                         rows.append({"value": np.log10(v), FIJECT_DEFAULTS.LEGEND_TITLE_CLASS: name})
                     else:
                         rows.append({"value": v, FIJECT_DEFAULTS.LEGEND_TITLE_CLASS: name})
             df = pd.DataFrame(rows)
             print(df.groupby(FIJECT_DEFAULTS.LEGEND_TITLE_CLASS).describe())
 
-            fig, ax = newFigAx(aspect_ratio)
+            fig, ax = newFigAx(do.aspect_ratio)
             ax: plt.Axes
 
             # Format outliers (https://stackoverflow.com/a/35133139/9352077)
@@ -186,25 +245,25 @@ class MultiHistogram(Diagram):
                 "marker": "."
             }
 
-            if log and value_axis_label:
-                value_axis_label = "$\log_{10}($" + value_axis_label + "$)$"
+            if do.log and do.value_axis_label:
+                value_axis_label = "$\log_{10}($" + do.value_axis_label + "$)$"
 
-            if horizontal:
+            if do.horizontal:
                 sns.boxplot(df, x="value", y=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS,
                             ax=ax, linewidth=0.5, flierprops=flierprops)
                 ax.set_xlabel(value_axis_label)
-                ax.set_ylabel(class_axis_label)
+                ax.set_ylabel(do.class_axis_label)
             else:
                 sns.boxplot(df, x=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS, y="value",
                             ax=ax, linewidth=0.5, flierprops=flierprops,
-                            whis=iqr_limit)
-                ax.set_xlabel(class_axis_label)
+                            whis=do.iqr_limit)
+                ax.set_xlabel(do.class_axis_label)
                 ax.set_ylabel(value_axis_label)
 
-                if value_tickspacing:
+                if do.value_tickspacing:
                     # Weird tick spacing hack that somehow works https://stackoverflow.com/a/44525175/9352077
                     import matplotlib.ticker as tck
-                    ax.yaxis.set_major_locator(tck.MultipleLocator(value_tickspacing))
+                    ax.yaxis.set_major_locator(tck.MultipleLocator(do.value_tickspacing))
                     ax.yaxis.set_major_formatter(tck.ScalarFormatter())
 
             # if x_lims:
@@ -259,9 +318,20 @@ class Histogram(MultiHistogram):
 
         graph = ScatterPlot(name=self.name)
         graph.addPointsToFamily("", quantiles, sorted(values))
-        fig, ax = graph.commit(aspect_ratio=(3.25,3.25), x_label="Theoretical quantiles", y_label="Empirical quantiles",
-                               family_sizes={"": 15}, only_for_return=True, legend=False,
-                               grid=True, x_tickspacing=tickspacing, y_tickspacing=tickspacing)
+        fig, ax = graph.commitWithArgs(
+            ScatterPlot.ArgsGlobal(
+                aspect_ratio=(3.25, 3.25),
+                x_label="Theoretical quantiles",
+                y_label="Empirical quantiles",
+                legend=False,
+                grid_x=True,
+                grid_y=True,
+                x_tickspacing=tickspacing,
+                y_tickspacing=tickspacing
+            ),
+            ScatterPlot.ArgsPerFamily(size=15),
+            only_for_return = True
+        )
         ax.axline(xy1=(0,0), slope=1.0, color="red", zorder=1, alpha=1.0, linewidth=0.75)
         self.exportToPdf(fig, stem_suffix="_qqplot")
 
