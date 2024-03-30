@@ -4,5 +4,8 @@ TODO:
     - The JSON and PDF names are checked for availability independently, so JSON _0 can correspond to PDF _2 etc.
     - Tables:
          - Should be easy to drop rows (possibly you should be able to do this before committing though) to get a reduced table
-         - Align &s
-         - Deltas should be able to be coloured. That's a LaTeX issue, though.
+         x Align &s
+         x Deltas should be able to be coloured.
+         x Multiplicative deltas
+         x Fix bug that if a delta is the maximum/minimum, it is not bolded.
+         x Fix bug that non-deltas are given a cell prefix/suffix.

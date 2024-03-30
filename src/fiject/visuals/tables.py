@@ -1,8 +1,11 @@
 from ..general import *
 from ..util.printing import lprint
 
+import re
+
 import dataclasses
 from dataclasses import dataclass
+from enum import Enum
 from typing import TypeVar, Generic, Any
 LeafContent = TypeVar("LeafContent")
 
@@ -94,6 +97,14 @@ class NamedTree(Generic[LeafContent]):
 TableRow    = NamedTree[int]
 TableColumn = NamedTree[Dict[int, Any]]
 
+class DeltaMode(Enum):  # Given a reference value r (e.g. 2), how should you compare a given value v (e.g. 3) with it?
+    NONE                = 1  # v       == 3
+    ABSOLUTE_DIFFERENCE = 2  # v - r   == +1
+    ABSOLUTE_FRACTION   = 3  # v/r     == 1.5x
+    ABSOLUTE_PERCENTAGE = 4  # 100*v/r == 150%
+    RELATIVE_FRACTION   = 5  # (v-r)/r == +0.5x
+    RELATIVE_PERCENTAGE = 6  # 100*(v-r)/r == +50%
+
 
 @dataclass
 class ColumnStyle:
@@ -102,7 +113,7 @@ class ColumnStyle:
     aggregate_at_rowlevel: int=-1  # Follows the same indexing standard as row borders. -1 computes extrema across all rows.
     do_bold_maximum: bool=False  # This is applied AFTER the cell functions and BEFORE rounding.
     do_bold_minimum: bool=False  # idem
-    do_deltas: bool=False  # If true, will output the first row of the group as-is, and for the others, the difference with that row.
+    do_deltas: DeltaMode=DeltaMode.NONE  # Will output the first row of the group as-is, and for the others, the difference or ratio with that row.
 
     # Cellwise. E.g.: to format a tokeniser's vocabulary size, you'd use function=lambda x: x/1000, digits=1, suffix="k"
     cell_prefix: str=""
@@ -195,7 +206,7 @@ class Table(Diagram):
     def commit(self, rowname_alignment="l",
                borders_between_columns_of_level: List[int]=None, borders_between_rows_of_level: List[int]=None,
                default_column_style: ColumnStyle=None, alternate_column_styles: Dict[Tuple[str,...], ColumnStyle]=None,
-               do_hhline_syntax=True):  # TODO: Needs an option to align &s. Also needs to replace any & in col/row names by \&.
+               do_hhline_syntax=True, do_align_ampersands=True):  # TODO: Needs to replace any & in col/row names by \&.
         """
         :param rowname_alignment: How to align row names (choose between "l", "c" and "r").
         :param borders_between_columns_of_level: List of layer indices that cause vertical lines to be drawn in the table
@@ -389,24 +400,39 @@ class Table(Diagram):
                         group_aggregates = aggregates_per_column[col_idx][groupkeys_per_columns[col_idx][row_identifier]]
 
                         # Process value: apply cell function, subtract reference (optionally), and round.
-                        is_relative = style.do_deltas and group_aggregates.id_of_first != row_identifier
+                        modify_cell = style.do_deltas == DeltaMode.NONE or group_aggregates.id_of_first != row_identifier
                         if isinstance(cell_value, (int, float)):
                             # Compute value
                             cell_value = style.cell_function(cell_value)
-                            if is_relative:
-                                cell_value -= group_aggregates.value_of_first
+
+                            # Compare value to extrema
+                            bolded = (style.do_bold_minimum and cell_value == group_aggregates.min) or \
+                                     (style.do_bold_maximum and cell_value == group_aggregates.max)
+
+                            # Relativise
+                            if modify_cell:
+                                ref_value = group_aggregates.value_of_first
+                                if style.do_deltas == DeltaMode.ABSOLUTE_DIFFERENCE:
+                                    cell_value = cell_value - ref_value
+                                elif style.do_deltas == DeltaMode.ABSOLUTE_FRACTION:
+                                    cell_value = divideOrDefault(cell_value, ref_value, default=r"$\infty$")
+                                elif style.do_deltas == DeltaMode.ABSOLUTE_PERCENTAGE:
+                                    cell_value = divideOrDefault(100*cell_value, ref_value, default=r"$\infty$")
+                                elif style.do_deltas == DeltaMode.RELATIVE_FRACTION:
+                                    cell_value = divideOrDefault(cell_value - ref_value, ref_value, default=r"$\infty$")
+                                elif style.do_deltas == DeltaMode.RELATIVE_PERCENTAGE:
+                                    cell_value = divideOrDefault(100*(cell_value - ref_value), ref_value, default=r"$\infty$")
+
                             # Format value
-                            cell_string = f"{cell_value:.{style.digits}f}"
-                            if is_relative and cell_value >= 0:
-                                cell_string = "+" + cell_string
+                            if not isinstance(cell_value, str):
+                                cell_string = f"{cell_value:.{style.digits}f}"
+                                if cell_value >= 0 and modify_cell and style.do_deltas in {DeltaMode.ABSOLUTE_DIFFERENCE, DeltaMode.RELATIVE_FRACTION, DeltaMode.RELATIVE_PERCENTAGE}:
+                                    cell_string = "+" + cell_string
                         else:
                             cell_string = str(cell_value)
+                            bolded = False
 
-                        # Compare value
-                        bolded = (style.do_bold_minimum and cell_value == group_aggregates.min) or \
-                                 (style.do_bold_maximum and cell_value == group_aggregates.max)
-
-                        cell_content = r"\bfseries"*bolded + style.cell_prefix + cell_string + style.cell_suffix
+                        cell_content = r"\bfseries "*bolded + style.cell_prefix*modify_cell + cell_string + style.cell_suffix*modify_cell
                     else:
                         cell_content = ""
 
@@ -423,16 +449,89 @@ class Table(Diagram):
 
             # Construct table
             header_prefix = max(line.find("&") for line in body_lines)
-            lines = [first_line] + \
-                    ["\t" + " "*header_prefix + line for line in header_lines] + \
-                    ["\t" + line for line in body_lines] + \
-                    [last_line]
+            if do_align_ampersands:
+                content_lines = [" " * header_prefix + line for line in header_lines] + \
+                                [                      line for line in body_lines]
+                content_lines = Table._alignAmpersands("\n".join(content_lines))
+            else:
+                content_lines = header_lines + body_lines
+                content_lines = "\n".join(content_lines)
+                
+            content_lines = Table._prefixWithTabs(content_lines)
+            all_lines = first_line + "\n" + content_lines + "\n" + last_line
 
             print(f"Writing .tex {self.name} ...")
             with open(PathHandling.getSafePath(PathHandling.getProductionFolder(), self.name, ".tex"), "w") as file:
-                file.write("\n".join(lines))
+                file.write(all_lines)
 
-            lprint(lines)
+            print(all_lines)
+
+    @staticmethod
+    def _alignAmpersands(tablebody: str):
+        """
+        TODO: There's one suboptimal mechanism here, which is that \multicolumn currently counts towards the largest length
+              in its FIRST column, whilst actually, what should happen is that *the length of a \multicolumn cell after
+              subtracting the length of all but its last column* is used to set the length of its last column.
+              The second challenge is that you actually append the intermediate columns' length in space to the \multicolumn
+              before you get to its last column.
+        """
+        def relu(x):
+            return max(x,0)
+
+        ampersand   = re.compile("&")
+        multicolumn = re.compile(r"\\multicolumn\{([0-9]+)\}\{.*?\}\{.*?\}")
+        line_end    = re.compile(r"(\\\\[^\n]*\n)")
+
+        table_rows = line_end.split(tablebody)
+        row_contents = table_rows[0::2]
+
+        parsed_rows = []
+        for row in row_contents:
+            row = row.strip()
+            if not row:
+                continue
+            parsed_rows.append([])
+            cursor = 0
+            for match in ampersand.finditer(row):
+                content = row[cursor:match.start()]
+                parsed_rows[-1].append(content)
+
+                submatch = multicolumn.search(content)
+                if submatch:
+                    for _ in range(2 * relu(int(submatch.group(1)) - 1)):
+                        parsed_rows[-1].append("")
+
+                parsed_rows[-1].append(match.group(0))
+                cursor = match.end()
+
+            content = row[cursor:]
+            parsed_rows[-1].append(content)
+            submatch = multicolumn.search(content)
+            if submatch:
+                for _ in range(2 * relu(int(submatch.group(1)) - 1)):
+                    parsed_rows[-1].append("")
+
+        padded_columns = []
+        for column in zip(*parsed_rows):
+            column = tuple(map(str.strip, column))
+            max_width = max(map(len, column))
+            column = tuple(map(lambda value: value + " " * (max_width - len(value)), column))
+            padded_columns.append(column)
+
+        final_content = list(map(lambda values: " ".join(values), zip(*padded_columns)))
+        separators = table_rows[1::2]
+        assert len(final_content) == len(separators) + 1
+
+        everything = []
+        while final_content or separators:
+            everything.append(final_content.pop(0))
+            if separators:
+                everything.append(separators.pop(0))
+        return "".join(everything)
+
+    @staticmethod
+    def _prefixWithTabs(tablebody: str):
+        return "\n".join(["\t" + line for line in tablebody.split("\n")])
 
     @staticmethod
     def getLaTeXpreamble(include_cellgradients: bool=False) -> str:
@@ -471,3 +570,11 @@ class Table(Diagram):
             \fi
         }
         """
+
+
+def relu(x):
+    return max(x,0)
+
+
+def divideOrDefault(x,y, eps=1e-12, default=float("inf")):
+    return x/y if abs(y) > eps else default
