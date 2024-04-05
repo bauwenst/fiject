@@ -91,9 +91,9 @@ class HistoBars(Diagram):
 
         self.data[family].append(y)
 
-    def commit(self, bar_width: float=1, center_ticks: bool=True, x_tickspacing: float=1,
+    def commit(self, bar_width: float=1, center_ticks: bool=True, x_tickspacing: float=None, y_tickspacing: float=None,
                sort_keyless_data=False, small_to_big=True,
-               y_label: str="", log_y=False, grid=True, aspect_ratio=None):
+               x_label: str="", y_label: str="", log_y=False, grid=True, aspect_ratio=None):
         """
         Based on
         https://stackoverflow.com/questions/62021334/barplot-in-seaborn-with-height-based-on-an-array
@@ -120,6 +120,11 @@ class HistoBars(Diagram):
                 main_ax.xaxis.set_major_locator(tkr.MultipleLocator(x_tickspacing))
                 main_ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
 
+            if y_tickspacing:
+                main_ax.yaxis.set_major_locator(tkr.MultipleLocator(y_tickspacing))
+                main_ax.yaxis.set_major_formatter(tkr.ScalarFormatter())
+
+            main_ax.set_xlabel(x_label)
             main_ax.set_ylabel(y_label)
             if log_y:
                 main_ax.set_yscale("log")

@@ -30,10 +30,10 @@ class MultiHistogram(Diagram):
             self.data[series_name] = []
         self.data[series_name].append(x_value)
 
-    def addMany(self, series_name: str, values: Sequence[float]):
+    def addMany(self, series_name: str, values: Iterable[float]):
         if series_name not in self.data:
             self.data[series_name] = []
-        self.data[series_name].extend(values)
+        self.data[series_name].extend(map(float, values))  # The map() ensures you can also use numpy.float datatypes.
 
     def toDataframe(self):
         # You would think all it takes is pd.Dataframe(dictionary), but that's the wrong way to do it.
@@ -229,7 +229,7 @@ class Histogram(MultiHistogram):
     def add(self, x_value: float):
         super().add("x_values", x_value)
 
-    def addMany(self, values: Sequence[float]):
+    def addMany(self, values: Iterable[float]):
         super().addMany("x_values", values)
 
     def commit_boxplot(self, x_label="", aspect_ratio=None):
