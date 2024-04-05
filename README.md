@@ -79,6 +79,11 @@ this repository in a footnote. For example, in LaTeX:
 ## Showcase
 A collage of all the figures I have drawn with this code across many university projects.
 
+The point is not how these figures look visually; you can produce equivalent plots with `matplotlib` and `seaborn`. 
+The point is rather that the computation required to get the data in these graphs was extensive, and hence *tweaking* 
+the visual parameters of these graphs would be equally expensive in `matplotlib` and `seaborn`. Also note how the graphs
+originate from a variety of applications, showing that `fiject` comes in handy for many different domains.
+
 ### Line graphs
 <p align="middle" >
   <img src="https://github.com/bauwenst/fiject/assets/145220868/59e49cab-55ad-466b-b6bb-a681f18088d8" width="40%" />⠀
