@@ -30,7 +30,7 @@ class MultiHistogram(Diagram):
     def add(self, series_name: str, x_value: float):
         if series_name not in self.data:
             self.data[series_name] = []
-        self.data[series_name].append(x_value)
+        self.data[series_name].append(float(x_value))
 
     def addMany(self, series_name: str, values: Iterable[float]):
         if series_name not in self.data:

@@ -57,7 +57,7 @@ class LineGraph(Diagram):
     def initSeries(self, series_name: str):
         self.data[series_name] = ([], [])
 
-    def add(self, series_name: str, x, y):
+    def add(self, series_name: str, x: float, y: float):
         """
         Add a single datapoint to the series (line) with the given label.
         """
@@ -67,14 +67,14 @@ class LineGraph(Diagram):
 
         if series_name not in self.data:
             self.initSeries(series_name)
-        self.data[series_name][0].append(x)
-        self.data[series_name][1].append(y)
+        self.data[series_name][0].append(float(x))
+        self.data[series_name][1].append(float(y))
 
     def addMany(self, series_name: str, xs: Sequence, ys: Sequence):
         if series_name not in self.data:
             self.initSeries(series_name)
-        self.data[series_name][0].extend(xs)
-        self.data[series_name][1].extend(ys)
+        self.data[series_name][0].extend(map(float,xs))
+        self.data[series_name][1].extend(map(float,ys))
 
     # TODO: Should be phased out at some point.
     def commit(self, aspect_ratio=None, x_label="", y_label="", legend_position="lower right",
@@ -179,20 +179,20 @@ class LineGraph(Diagram):
             if diagram_options.logx:
                 main_ax.set_xscale("log")
                 main_ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1,10)) if diagram_options.tick_log_multiples else [1]))
-                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.scientific_notation_ticks else tkr.ScalarFormatter())
+                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
             elif diagram_options.x_tickspacing:
                 main_ax.xaxis.set_major_locator(tkr.MultipleLocator(diagram_options.x_tickspacing))
-                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.scientific_notation_ticks else tkr.ScalarFormatter())
+                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
 
             if diagram_options.logy:
                 main_ax.set_yscale("log")
                 main_ax.yaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1,10)) if diagram_options.tick_log_multiples else [1]))
-                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.scientific_notation_ticks else tkr.ScalarFormatter())
+                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
                 # main_ax.yaxis.set_minor_locator(tkr.LogLocator(base=10, subs="all"))
                 # main_ax.yaxis.set_minor_formatter(tkr.LogFormatterSciNotation())
             elif diagram_options.y_tickspacing:
                 main_ax.yaxis.set_major_locator(tkr.MultipleLocator(diagram_options.y_tickspacing))
-                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.scientific_notation_ticks else tkr.ScalarFormatter())
+                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
 
             if diagram_options.y_lims:  # Yes, twice. Don't ask.
                 main_ax.set_ylim(diagram_options.y_lims[0], diagram_options.y_lims[1])
