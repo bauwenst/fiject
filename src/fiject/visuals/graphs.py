@@ -3,6 +3,8 @@ import scipy
 import itertools
 from dataclasses import dataclass
 
+import matplotlib.ticker as tkr
+
 from ..general import *
 
 
@@ -27,6 +29,8 @@ class LineGraph(Diagram):
         y_tickspacing: int = None
         logx: bool = False
         logy: bool = False
+        tick_scientific_notation: bool = False  # Not 10 000 but 1*10^4.
+        tick_log_multiples: bool = False  # Instead of ticking 10^1, 10^2, 10^3... also tick 2*10^1, 3*10^1, 4*10^1...
 
         functions: Dict[str,Callable[[float],float]] = None  # Functions you want to evaluate on-the-fly during a commit.
         function_samples: int = 100
@@ -144,6 +148,9 @@ class LineGraph(Diagram):
 
                 # Draw lines
                 style = marker + line
+                if not style:  # No point adding air to the legend.
+                    continue
+
                 if diagram_options.logx and diagram_options.logy:
                     main_ax.loglog(  xs, ys, style, c=colour, label=name, linewidth=diagram_options.curve_linewidth)
                 elif diagram_options.logx:
@@ -167,13 +174,25 @@ class LineGraph(Diagram):
             if diagram_options.y_lims:
                 main_ax.set_ylim(diagram_options.y_lims[0], diagram_options.y_lims[1])
 
-            if diagram_options.x_tickspacing:
-                x_min, x_max = main_ax.get_xlim()
-                main_ax.set_xticks(np.arange(0, x_max, diagram_options.x_tickspacing))
+            # FIXME: Known issue: you can't make 5 x 10^1 show as a tick label.
+            #        I even found a SO post where the plot has exactly that issue: https://stackoverflow.com/q/49750107/9352077
+            if diagram_options.logx:
+                main_ax.set_xscale("log")
+                main_ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1,10)) if diagram_options.tick_log_multiples else [1]))
+                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.scientific_notation_ticks else tkr.ScalarFormatter())
+            elif diagram_options.x_tickspacing:
+                main_ax.xaxis.set_major_locator(tkr.MultipleLocator(diagram_options.x_tickspacing))
+                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.scientific_notation_ticks else tkr.ScalarFormatter())
 
-            if diagram_options.y_tickspacing:
-                y_min, y_max = main_ax.get_ylim()
-                main_ax.set_yticks(np.arange(0, y_max, diagram_options.y_tickspacing))
+            if diagram_options.logy:
+                main_ax.set_yscale("log")
+                main_ax.yaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1,10)) if diagram_options.tick_log_multiples else [1]))
+                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.scientific_notation_ticks else tkr.ScalarFormatter())
+                # main_ax.yaxis.set_minor_locator(tkr.LogLocator(base=10, subs="all"))
+                # main_ax.yaxis.set_minor_formatter(tkr.LogFormatterSciNotation())
+            elif diagram_options.y_tickspacing:
+                main_ax.yaxis.set_major_locator(tkr.MultipleLocator(diagram_options.y_tickspacing))
+                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.scientific_notation_ticks else tkr.ScalarFormatter())
 
             if diagram_options.y_lims:  # Yes, twice. Don't ask.
                 main_ax.set_ylim(diagram_options.y_lims[0], diagram_options.y_lims[1])
@@ -233,7 +252,7 @@ class LineGraph(Diagram):
     @staticmethod
     def _newFigAx(diagram_options: ArgsGlobal):
         fig, main_ax = newFigAx(diagram_options.aspect_ratio)
-        main_ax.grid(True, which='both', linewidth=diagram_options.grid_linewidth if diagram_options.grid_linewidth is not None else FIJECT_DEFAULTS.GRIDWIDTH)
+        main_ax.grid(True, which='major', linewidth=diagram_options.grid_linewidth if diagram_options.grid_linewidth is not None else FIJECT_DEFAULTS.GRIDWIDTH)
         main_ax.axhline(y=0, color='k', lw=0.5)
         return fig, main_ax
 

@@ -121,6 +121,9 @@ class ColumnStyle:
     digits: int=2  # This option might seem redundant given that we allow applying any function, but it takes the burden off the user to apply either round() (which drops zeroes) or something like f"{x:.2f}".
     cell_suffix: str=""
 
+    cell_default_if_empty: str=""
+
+
 RowGroupKey = Tuple[str,...]
 
 @dataclass
@@ -434,7 +437,7 @@ class Table(Diagram):
 
                         cell_content = r"\bfseries "*bolded + style.cell_prefix*modify_cell + cell_string + style.cell_suffix*modify_cell
                     else:
-                        cell_content = ""
+                        cell_content = style.cell_default_if_empty
 
                     if not right_border:
                         line += " & " + cell_content  # No alignment needed, since it is set in the table header.
