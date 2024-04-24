@@ -84,8 +84,8 @@ class ScatterPlot(Diagram):
                 ax.yaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999))
                 ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation())
             elif do.y_tickspacing:
-                ax.xaxis.set_major_locator(tkr.MultipleLocator(do.y_tickspacing))
-                ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
+                ax.yaxis.set_major_locator(tkr.MultipleLocator(do.y_tickspacing))
+                ax.yaxis.set_major_formatter(tkr.ScalarFormatter())
 
             if do.logx and do.logy:  # Otherwise you have a skewed view of horizontal vs. vertical distances.
                 ax.set_aspect("equal")
