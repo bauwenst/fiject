@@ -18,6 +18,9 @@ __all__ = ["LineGraph", "MergedLineGraph",
 import matplotlib.font_manager
 from matplotlib import rc
 
-# Enable LaTeX support
-rc('font', **{'serif': ['Computer Modern']})
-rc('text', usetex=True)
+# Enable LaTeX support if available (https://stackoverflow.com/a/75478997/9352077)
+import shutil
+
+if shutil.which('latex'):
+    rc('font', **{'serif': ['Computer Modern']})
+    rc('text', usetex=True)
