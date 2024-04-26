@@ -1,5 +1,5 @@
 from .general import CacheMode
-from .visuals.graphs import LineGraph, MergedLineGraph
+from .visuals.graphs import LineGraph, MergedLineGraph, StochasticLineGraph
 from .visuals.histos import MultiHistogram, Histogram
 from .visuals.bars import Bars, HistoBars
 from .visuals.scatter import ScatterPlot, ScatterPlot_DiscreteContinuous
