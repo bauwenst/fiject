@@ -69,16 +69,3 @@ class FijectCallback(TrainerCallback):
     def _commit(self):
         self.graph.commit(legend_position="upper right", x_label="Training batches", y_label="Validation set performance",
                           do_points=False, grid_linewidth=0.1)
-
-
-class EvaluateBeforeTrainingCallback(TrainerCallback):
-    """
-    Triggers evaluation before the first training batch, so that you can benchmark all metrics before any finetuning
-    has been done (and then print it or let it be caught by another callback like the above for plotting).
-    https://discuss.huggingface.co/t/how-to-evaluate-before-first-training-step/18838/7
-
-    Hoping this doesn't slow down the training too much, since you are interrupting every batch with this.
-    """
-    def on_step_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        if state.global_step == 0:
-            control.should_evaluate = True
