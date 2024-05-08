@@ -93,7 +93,7 @@ class CacheMode(Enum):
 
 class Diagram(ABC):
 
-    def __init__(self, name: str, caching: CacheMode=CacheMode.NONE):
+    def __init__(self, name: str, caching: CacheMode=CacheMode.NONE, overwriting: bool=False):
         """
         Constructs a Diagram object with a name (for file I/O) and space to store data.
         The reason why the subclasses don't have initialisers is two-fold:
@@ -109,6 +109,7 @@ class Diagram(ABC):
         :param name: The file stem to be used for everything produced by this object.
         :param caching: Determines how the constructor will attempt to find the most recent data file matching the name
                         and load those data into the object. Also determines whether commit methods will store data.
+        :param overwriting: Whether to overwrite the youngest found versions of the files to save.
         """
         self.name = name
         self.data = dict()  # All figure classes are expected to store their data in a dictionary by default, so that saving doesn't need to be re-implemented each time.
@@ -117,6 +118,7 @@ class Diagram(ABC):
 
         self.needs_computation = (caching == CacheMode.NONE or caching == CacheMode.WRITE_ONLY)
         self.will_be_stored    = (caching == CacheMode.WRITE_ONLY)
+        self.overwrite = overwriting
         if caching == CacheMode.READ_ONLY or caching == CacheMode.IF_MISSING:
             already_exists = False
 
@@ -124,8 +126,9 @@ class Diagram(ABC):
             cache_path = PathHandling.getHighestAlias(PathHandling.getRawFolder(), self.name, ".json")
             if cache_path is not None:  # Possible cache hit
                 try:
-                    self.load(cache_path)
-                    print(f"Successfully preloaded data for diagram '{self.name}'.")
+                    metadata = self.load(cache_path)
+                    seconds = metadata['time']['start-to-finish-secs']
+                    print(f"Successfully preloaded data for diagram '{self.name}' sparing you {seconds//60}m{seconds%60}s of computation time.")
                     already_exists = True
                 except Exception as e:
                     print(f"Could not load cached diagram '{self.name}':", e)
@@ -137,51 +140,83 @@ class Diagram(ABC):
     ### STATIC METHODS (should only be used if the non-static methods don't suffice)
 
     @staticmethod
-    def safeFigureWrite(stem: str, suffix: str, figure, show=False):
+    def writeFigure(stem: str, suffix: str, figure: plt.Figure, overwrite_if_possible: bool=False, show: bool=False):
         """
         Write a matplotlib figure to a file. For best results, use suffix=".pdf".
-        The write is "safe" because it searches for a file name that doesn't exist yet, instead of overwriting.
+
+        :param overwrite_if_possible: If False, doesn't overwrite existing files and hence preserves them.
+                                      If True and the old file is still locked by e.g. Acrobat, will pretend this is False.
         """
         if show:
-            plt.show()  # Somtimes matplotlib hangs on savefig, and showing the figure can "slap the TV" to get it to work.
+            plt.show()  # Sometimes matplotlib hangs on savefig, and showing the figure can "slap the TV" to get it to work.
+
+        def writeGivenFigure(try_this_path: Path):
+            figure.savefig(try_this_path.as_posix(), bbox_inches='tight', dpi=FIJECT_DEFAULTS.DPI_IF_NOT_PDF)  # DPI is ignored for PDF output.
+
         print(f"Writing figure {stem} ...")
-        figure.savefig(PathHandling.getSafePath(PathHandling.getProductionFolder(), stem, suffix).as_posix(), bbox_inches='tight')
+        existing_path = PathHandling.getHighestAlias(PathHandling.getProductionFolder(), stem, suffix)
+        safe_path     = PathHandling.getSafePath(PathHandling.getProductionFolder(), stem, suffix)
+        if overwrite_if_possible and existing_path is not None:
+            try:
+                writeGivenFigure(existing_path)
+            except:  # Probably open in some kind of viewer.
+                writeGivenFigure(safe_path)
+        else:
+            writeGivenFigure(safe_path)
 
     @staticmethod
-    def safeDatapointWrite(stem: str, data: dict):
+    def writeData(stem: str, data: dict, overwrite_if_possible: bool=False):
         """
-        Write a json of data points to a file. Also safe.
+        Write a json of data points to a file.
+
+        :param overwrite_if_possible: See writeFigure().
         """
+        def writeGivenData(try_this_path: Path):
+            with open(try_this_path, "w", encoding="utf-8") as file:
+                json.dump(data, file)
+
         print(f"Writing json {stem} ...")
-        with open(PathHandling.getSafePath(PathHandling.getRawFolder(), stem, ".json"), "w") as file:
-            json.dump(data, file)
+        existing_path = PathHandling.getHighestAlias(PathHandling.getRawFolder(), stem, ".json")
+        safe_path     = PathHandling.getSafePath(PathHandling.getRawFolder(), stem, ".json")
+        if overwrite_if_possible and existing_path is not None:
+            try:
+                writeGivenData(existing_path)
+            except:  # Should not really happen because JSON editors usually don't lock files.
+                writeGivenData(safe_path)
+        else:
+            writeGivenData(safe_path)
 
     ### IMPLEMENTATIONS
 
     def exportToPdf(self, fig, stem_suffix: str=""):
-        Diagram.safeFigureWrite(stem=self.name + stem_suffix, suffix=".pdf", figure=fig)
+        Diagram.writeFigure(stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, figure=fig, overwrite_if_possible=self.overwrite)
 
     def save(self, metadata: dict=None):
-        Diagram.safeDatapointWrite(stem=self.name, data={
+        Diagram.writeData(stem=self.name, data={
             "time": {
                 "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "start-to-finish-secs": round(time.perf_counter() - self.creation_time, 2),
             },
             "metadata": metadata or dict(),
-            "data": self._save()
-        })
+            "data": self._save()  # TODO: This is very, very inefficient. You should store data not as ASCII but as a binary file or in some other compressed format.
+        }, overwrite_if_possible=self.overwrite)
 
-    def load(self, json_path: Path):
+    def load(self, json_path: Path) -> dict:
+        """
+        Wrapper around _load() that unpacks the json file, calls _load(), and returns metadata.
+        """
         if not json_path.suffix == ".json" or not json_path.is_file():
             raise ValueError(f"Cannot open JSON: file {json_path.as_posix()} does not exist.")
 
-        with open(json_path, "r") as handle:
+        with open(json_path, "r", encoding="utf-8") as handle:
             object_as_dict: dict = json.load(handle)
 
         if "data" not in object_as_dict:
             raise KeyError(f"Cannot read JSON file: 'data' key missing.")
 
         self._load(object_as_dict["data"])
+        object_as_dict.pop("data")
+        return object_as_dict
 
     ### INSTANCE METHODS (can be overridden for complex objects whose data dictionaries aren't JSON-serialisable and/or have more state and fields)
 

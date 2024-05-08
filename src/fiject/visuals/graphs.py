@@ -231,7 +231,7 @@ class LineGraph(Diagram):
         ax2.add_artist(legend_1)
 
         # At last, save.
-        Diagram.safeFigureWrite(name, ".pdf", fig)
+        Diagram.writeFigure(name, "." + FIJECT_DEFAULTS.RENDERING_FORMAT, fig)
 
     @staticmethod
     def qndLoadAndCommit(json_path: Path):
