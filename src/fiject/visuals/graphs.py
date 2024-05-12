@@ -1,11 +1,13 @@
-import numpy as np
+from dataclasses import dataclass
+
+from math import sqrt
 import scipy
 import itertools
-from dataclasses import dataclass
 
 import matplotlib.ticker as tkr
 
 from ..general import *
+from ..util.functions import weightedMean, weightedVariance
 
 
 class LineGraph(Diagram):
@@ -372,24 +374,33 @@ class StochasticLineGraph(Diagram):
 
     def _load(self, saved_data: dict):
         for series_name, samples in saved_data.items():
-            if not isinstance(samples, dict) or any(len(ys) == 0 for x,ys in samples.items()) or any(not x.isnumeric() for x in samples):
+            if not isinstance(samples, list) \
+                    or any(len(tup) != 3 for tup in samples) \
+                    or any(not isinstance(ys, list) or not isinstance(ws, list)
+                           or len(ys) == 0 or len(ws) == 0
+                           or len(ys) != len(ws) for _,ys,ws in samples):
                 raise ValueError("Graph data corrupted: either samples aren't stored as a dictionary, or at least one input has zero output samples.")
 
-            for x, ys in samples.items():
-                for y in ys:
-                    self.addSample(series_name, float(x), y)
+            for x, ys, ws in samples:
+                for y,w in zip(ys, ws):
+                    self.addSample(series_name, x, y, weight=w)
 
-    def addSample(self, series_name: str, x, y):
+    def addSample(self, series_name: str, x: float, y: float, weight: float=1.0):
         if type(x) == str or type(y) == str:
             print("WARNING: You are trying to use a string as x or y data. The datapoint was discarded, because this causes nonsensical graphs.")
             return
 
         if series_name not in self.data:
-            self.data[series_name] = dict()
-        if x not in self.data[series_name]:
-            self.data[series_name][x] = []
+            self.cache[series_name] = dict()  # {input value} -> index in data list
+            self.data[series_name] = []
 
-        self.data[series_name][x].append(y)
+        if x not in self.cache[series_name]:
+            self.cache[series_name][x] = len(self.data[series_name])
+            self.data[series_name].append( (x,[],[]) )
+
+        index_of_x = self.cache[series_name][x]
+        self.data[series_name][index_of_x][1].append(y)
+        self.data[series_name][index_of_x][2].append(weight)
 
     def commit(self, diagram_options: ArgsGlobal, default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine]=None,
                only_for_return=False, existing_figax: tuple=None):
@@ -418,17 +429,17 @@ class StochasticLineGraph(Diagram):
                 sorted_input         = []
                 average_line         = []
                 upper_deviation_line = []
-                for x, ys in sorted(samples.items(), key=lambda i: i[0]):
+                for x, ys, ws in sorted(samples, key=lambda i: i[0]):
                     n = len(ys)
-                    Ybar_n = np.mean(ys)
-                    S_n    = np.std(ys, ddof=1)
+                    Ybar_n = weightedMean(ys, ws)
+                    S_n    = sqrt(weightedVariance(ys, ws, ddof=1))  # S_n² is an unbiased estimator of the variance.
                     if diagram_options.twosided_ci_percentage:
                         remainder_percentage = 100 - diagram_options.twosided_ci_percentage  # E.g. 5% for 95% CI
                         one_side_remainder   = remainder_percentage/2                        # => Each side outside the CI captures 2.5%
                         alpha = (100-one_side_remainder)/100                                 # => Alpha is 0.975.
                         distribution: scipy.stats.rv_continuous = scipy.stats.t(n-1)
                         quantile = distribution.ppf(alpha)
-                        deviation = quantile*S_n/np.sqrt(n)
+                        deviation = quantile*S_n/sqrt(n)
                     else:
                         deviation = S_n
 

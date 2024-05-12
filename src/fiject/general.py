@@ -112,7 +112,8 @@ class Diagram(ABC):
         :param overwriting: Whether to overwrite the youngest found versions of the files to save.
         """
         self.name = name
-        self.data = dict()  # All figure classes are expected to store their data in a dictionary by default, so that saving doesn't need to be re-implemented each time.
+        self.data  = dict()  # All figure classes are expected to store their data in a dictionary by default, so that saving doesn't need to be re-implemented each time.
+        self.cache = dict()  # For runtime acceleration if you want it. Is not stored.
         self.clear()        # Can be used to initialise the content of self.data.
         self.creation_time = time.perf_counter()
 
@@ -127,7 +128,7 @@ class Diagram(ABC):
             if cache_path is not None:  # Possible cache hit
                 try:
                     metadata = self.load(cache_path)
-                    seconds = metadata['time']['start-to-finish-secs']
+                    seconds = int(metadata['time']['start-to-finish-secs'])
                     print(f"Successfully preloaded data for diagram '{self.name}' sparing you {seconds//60}m{seconds%60}s of computation time.")
                     already_exists = True
                 except Exception as e:
@@ -225,6 +226,7 @@ class Diagram(ABC):
         Reset all data in the object.
         """
         self.data = dict()
+        self.cache = dict()
 
     def _save(self) -> dict:
         """
