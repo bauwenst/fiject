@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fiject"
-version = "2024.03.01"
+version = "2024.07.01"
 dependencies = [
   "matplotlib >= 3.5.3",
   "seaborn >= 0.12.1"

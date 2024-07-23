@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import math
 import pandas as pd
 import scipy
+from natsort import natsorted
 
 import seaborn as sns
 import matplotlib.legend as lgd  # Only for type-checking.
@@ -72,7 +73,7 @@ class MultiHistogram(Diagram):
 
     def commit_histplot(self, binwidth: float=1, log_x=False, log_y=False,
                         relative_counts: bool=False, average_over_bin: bool=False,
-                        x_lims: Tuple[Optional[int],Optional[int]]=None, aspect_ratio=None,
+                        x_lims: Tuple[Optional[float],Optional[float]]=None, aspect_ratio=None,
                         x_tickspacing: float=1, y_tickspacing: float=None, center_ticks=False,
                         do_kde=True, kde_smoothing=True,
                         border_colour=None, fill_colour=None, do_hatch=False, # Note: colour=None means "use default colour", not "use no colour".
@@ -191,6 +192,7 @@ class MultiHistogram(Diagram):
     @dataclass
     class ArgsGlobal_BoxPlot:
         iqr_limit: float=1.5
+        sort_classes: bool=True
 
         aspect_ratio: Tuple[float,float]=None
         horizontal: bool=False
@@ -245,8 +247,9 @@ class MultiHistogram(Diagram):
                 "marker": "."
             }
 
+            value_axis_label = do.value_axis_label
             if do.log and do.value_axis_label:
-                value_axis_label = "$\log_{10}($" + do.value_axis_label + "$)$"
+                value_axis_label = "$\log_{10}($" + value_axis_label + "$)$"
 
             if do.horizontal:
                 sns.boxplot(df, x="value", y=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS,
@@ -256,7 +259,7 @@ class MultiHistogram(Diagram):
             else:
                 sns.boxplot(df, x=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS, y="value",
                             ax=ax, linewidth=0.5, flierprops=flierprops,
-                            whis=do.iqr_limit)
+                            whis=do.iqr_limit, order=natsorted(self.data.keys()) if do.sort_classes else None)
                 ax.set_xlabel(do.class_axis_label)
                 ax.set_ylabel(value_axis_label)
 

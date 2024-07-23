@@ -112,6 +112,11 @@ class Diagram(ABC):
         :param overwriting: Whether to overwrite the youngest found versions of the files to save.
         """
         self.name = name
+        if FIJECT_DEFAULTS.GLOBAL_STEM_PREFIX:
+            self.name = FIJECT_DEFAULTS.GLOBAL_STEM_PREFIX + "_" + self.name
+        if FIJECT_DEFAULTS.GLOBAL_STEM_SUFFIX:
+            self.name = self.name + "_" + FIJECT_DEFAULTS.GLOBAL_STEM_SUFFIX
+
         self.data  = dict()  # All figure classes are expected to store their data in a dictionary by default, so that saving doesn't need to be re-implemented each time.
         self.cache = dict()  # For runtime acceleration if you want it. Is not stored.
         self.clear()        # Can be used to initialise the content of self.data.
