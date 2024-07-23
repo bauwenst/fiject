@@ -91,7 +91,7 @@ class NamedTree(Generic[LeafContent]):
             node.name = name
 
     def __repr__(self):
-        return "Column('" + self.name + "')"
+        return f"Tree('{self.name}', [{', '.join([child.__repr__() for child in self.children])}])"
 
 
 TableRow    = NamedTree[int]
@@ -168,8 +168,11 @@ class Table(Diagram):
         return self.data["row-tree"]
 
     def set(self, value: float, row_path: List[str], column_path: List[str]):
-        if not column_path:
-            raise ValueError("Column path needs at least one column.")
+        if not column_path or not row_path:
+            raise ValueError("Column and row path need at least one element.")
+        column_path = list(map(str, column_path))
+        row_path    = list(map(str, row_path))
+
         if not self.data:
             self.clear()
 
@@ -209,7 +212,7 @@ class Table(Diagram):
     def commit(self, rowname_alignment="l",
                borders_between_columns_of_level: List[int]=None, borders_between_rows_of_level: List[int]=None,
                default_column_style: ColumnStyle=None, alternate_column_styles: Dict[Tuple[str,...], ColumnStyle]=None,
-               do_hhline_syntax=True, do_align_ampersands=True):  # TODO: Needs to replace any & in col/row names by \&.
+               do_hhline_syntax=True, do_align_ampersands=True, body_only: bool=False, only_for_return: bool=False):  # TODO: Needs to replace any & in col/row names by \&.
         """
         :param rowname_alignment: How to align row names (choose between "l", "c" and "r").
         :param borders_between_columns_of_level: List of layer indices that cause vertical lines to be drawn in the table
@@ -240,7 +243,7 @@ class Table(Diagram):
                 raise ValueError(f"This table has {margin_depth} row levels, with identifiers 0 to {margin_depth-1}. You gave {borders_between_rows_of_level}.")
 
             # STEP 1: Make first line. Note that there are no default borders (indicated with | normally). Everything is regulated by multicolumn below.
-            first_line = r"\begin{tabular}{" + rowname_alignment*margin_depth + "||"
+            first_line = r"\begin{tabular}{" + (rowname_alignment*margin_depth + "||")*(not body_only)
             for path in table.getPaths():
                 identifier = tuple(node.name for node in path[1:])
                 style = alternate_column_styles.get(identifier, default_column_style)
@@ -309,6 +312,9 @@ class Table(Diagram):
             header_lines[-1] += r"\hline\hline" if not do_hhline_syntax else \
                                 r"\hhline{*{" + str(margin_depth+table.width()) + r"}{=}}"
 
+            if body_only:
+                header_lines = []
+
             # STEP 3: Find maximal and minimal values per column, possibly per row group (which differs per column!)
             aggregates_per_column: List[Dict[RowGroupKey, RowGroupInColumn]] = []  # List over all columns, dict over all group keys.
             groupkeys_per_columns: List[Dict[int,RowGroupKey]] = []  # List over all columns, dict over all row identifiers.
@@ -367,7 +373,7 @@ class Table(Diagram):
                         row_path_changed = True
                         prev_names[row_depth_idx] = name
 
-                    if row_path_changed and node is not None:  # Reprint every on the path if a parent changed, even if it hasn't changed since the row above.
+                    if row_path_changed and node is not None:  # Reprint every name on the path if a parent changed, even if that name hasn't changed since the row above.
                         width = node.width()
                         if width > 1:
                             line += r"\multirow{" + str(width) + "}{*}{" + node.name + "}"
@@ -380,6 +386,9 @@ class Table(Diagram):
                 if row_idx != 0 and cline_start is not None:
                     body_lines[-1] += r"\cline{" + f"{cline_start}-{margin_depth+table.width()}" + "}" if not do_hhline_syntax else \
                                       r"\hhline{" + "~"*(cline_start-1) + r"*{" + str(margin_depth+table.width()-cline_start+1) + r"}{-}}"
+
+                if body_only:
+                    line = ""
 
                 # 4.2: Row body.
                 for col_idx, col_path in enumerate(table.getPaths()):
@@ -444,6 +453,8 @@ class Table(Diagram):
                     else:
                         line += " & " + r"\multicolumn{1}{" + style.alignment + "|}{" + cell_content + "}"
                 line += r" \\"
+                if body_only:
+                    line = line[line.find("&")+1:].lstrip()
                 body_lines.append(line)
             body_lines[-1] = body_lines[-1][:-2]  # Strip off the \\ at the end.
 
@@ -451,7 +462,7 @@ class Table(Diagram):
             last_line = r"\end{tabular}"
 
             # Construct table
-            header_prefix = max(line.find("&") for line in body_lines)
+            header_prefix = max(line.find("&") for line in body_lines)  # line.find gives the first & in the line. TODO: Ignore ampersands in names.
             if do_align_ampersands:
                 content_lines = [" " * header_prefix + line for line in header_lines] + \
                                 [                      line for line in body_lines]
@@ -463,11 +474,12 @@ class Table(Diagram):
             content_lines = Table._prefixWithTabs(content_lines)
             all_lines = first_line + "\n" + content_lines + "\n" + last_line
 
-            print(f"Writing .tex {self.name} ...")
-            with open(PathHandling.getSafePath(PathHandling.getProductionFolder(), self.name, ".tex"), "w") as file:
-                file.write(all_lines)
+            if not only_for_return:
+                print(f"Writing .tex {self.name} ...")
+                with open(PathHandling.getSafePath(PathHandling.getProductionFolder(), self.name, ".tex"), "w") as file:
+                    file.write(all_lines)
 
-            print(all_lines)
+            return all_lines
 
     @staticmethod
     def _alignAmpersands(tablebody: str):
