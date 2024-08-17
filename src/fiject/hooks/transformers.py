@@ -9,7 +9,7 @@ Example usage:
         callbacks=[
             EvaluateBeforeTrainingCallback(),
             FijectCallback("loss",  evals_between_commits=10),
-            FijectCallback("other", evals_between_commits=10, metrics=["pr", "re", "f1", "acc"])
+            FijectCallback("other", evals_between_commits=10, metric_names_with_formatting={"pr": "Pr", "re": "Re", "f1": "$F_1$", "acc": "Accuracy"])
         ],
         ...
     )
@@ -62,6 +62,9 @@ class FijectCallback(TrainerCallback):
         self.evals_so_far += 1  # By incrementing first, you never commit after just one iteration.
         if self.evals_per_commit > 0 and self.evals_so_far % self.evals_per_commit == 0:
             self._commit()
+
+    def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):  # Every time a checkpoint is made, also save a graph.
+        self._commit()
 
     def on_train_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         self._commit()

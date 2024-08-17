@@ -129,8 +129,12 @@ class LineGraph(Diagram):
                 fig, main_ax = existing_figax
 
             # Get all data, including procedurally generated data.
-            min_x = min(min(xs) for _,(xs,_) in self.data.items())
-            max_x = max(max(xs) for _,(xs,_) in self.data.items())
+            try:
+                min_x = min(min(xs) for _,(xs,_) in self.data.items())
+                max_x = max(max(xs) for _,(xs,_) in self.data.items())
+            except:  # TODO: If you ever add x_lims, those should definitely go here.
+                min_x = -1
+                max_x = +1
 
             all_series = [(name, xy) for name, xy in self.data.items()]
             if not diagram_options.logx:

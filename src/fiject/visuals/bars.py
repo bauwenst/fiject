@@ -12,6 +12,19 @@ class Bars(Diagram):
     bars, which is equal to the amount of groups.
     """
 
+    @dataclass
+    class ArgsGlobal:
+        bar_width: float
+        group_spacing: float
+
+        group_names: Sequence[str]
+        diagonal_labels=True
+
+        aspect_ratio: Tuple[float,float]=None
+        y_tickspacing: float=None
+        log_y: bool=False
+        y_label: str=""
+
     def _load(self, saved_data: dict):
         self.data = saved_data  # TODO: Needs more sanity checks
 
@@ -61,6 +74,20 @@ class Bars(Diagram):
 
             self.exportToPdf(fig)
 
+    def commitWithArgs(self, global_args: ArgsGlobal):
+        return self.commit(
+            bar_width=global_args.bar_width,
+            group_spacing=global_args.group_spacing,
+
+            group_names=global_args.group_names,
+            diagonal_labels=global_args.diagonal_labels,
+
+            aspect_ratio=global_args.aspect_ratio,
+            y_tickspacing=global_args.y_tickspacing,
+            log_y=global_args.log_y,
+            y_label=global_args.y_label
+        )
+
 
 class HistoBars(Diagram):
     """
@@ -74,6 +101,22 @@ class HistoBars(Diagram):
     Unlike a histogram, you get exactly one bar per unique input value (because inputs are "mathematically meaningless"
     like in a categorical bar plot and hence aren't binned).
     """
+
+    @dataclass
+    class ArgsGlobal:
+        sort_keyless_data: bool = False
+        small_to_big: bool = True
+
+        bar_width: float = 1
+        center_ticks: bool = True
+
+        aspect_ratio: Tuple[float,float] = None
+        grid: bool = True
+        x_tickspacing: float = None
+        x_label: str = ""
+        y_tickspacing: float = None
+        y_label: str = ""
+        log_y: bool = False
 
     def add(self, family: str, x: float, y: float):
         if family not in self.data:
@@ -136,3 +179,20 @@ class HistoBars(Diagram):
             main_ax.legend()
 
             self.exportToPdf(fig)
+
+    def commitWithArgs(self, global_args: ArgsGlobal):
+        return self.commit(
+            sort_keyless_data=global_args.sort_keyless_data,
+            small_to_big=global_args.small_to_big,
+
+            bar_width=global_args.bar_width,
+            center_ticks=global_args.center_ticks,
+
+            aspect_ratio=global_args.aspect_ratio,
+            grid=global_args.grid,
+            x_tickspacing=global_args.x_tickspacing,
+            x_label=global_args.x_label,
+            y_tickspacing=global_args.y_tickspacing,
+            y_label=global_args.y_label,
+            log_y=global_args.log_y
+        )
