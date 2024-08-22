@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import matplotlib.ticker as tkr
 
 from ..general import *
