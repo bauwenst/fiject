@@ -25,7 +25,7 @@ from typing import List, Dict
 class FijectCallback(TrainerCallback):
     """
     Callback object passed to a HuggingFace Trainer that will add an evaluation point to a Fiject graph, and will commit
-    the result every-so-often.
+    the result every N evaluations.
 
     You can either choose the evaluation metrics yourself, or let it default to the metric used to rank models.
     """
@@ -34,6 +34,7 @@ class FijectCallback(TrainerCallback):
         self.graph = LineGraph(plot_name, CacheMode.WRITE_ONLY)
         self.evals_per_commit = evals_between_commits
         self.evals_so_far = 0
+        self.dont_commit_again_if_you_are_still_at = -1
 
         self.metrics_tracked = None if not metric_names_with_formatting \
                           else {handle[handle.startswith("eval_")*len("eval_"):]: formatted for handle,formatted in metric_names_with_formatting.items()}
@@ -61,14 +62,18 @@ class FijectCallback(TrainerCallback):
 
         self.evals_so_far += 1  # By incrementing first, you never commit after just one iteration.
         if self.evals_per_commit > 0 and self.evals_so_far % self.evals_per_commit == 0:
-            self._commit()
+            self._commit(state.global_step)
 
     def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):  # Every time a checkpoint is made, also save a graph.
-        self._commit()
+        self._commit(state.global_step)
 
     def on_train_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        self._commit()
+        self._commit(state.global_step)
 
-    def _commit(self):
+    def _commit(self, current_time: int):
+        if self.dont_commit_again_if_you_are_still_at == current_time:
+            return
+
+        self.dont_commit_again_if_you_are_still_at = current_time
         self.graph.commit(legend_position="upper right", x_label="Training batches", y_label="Validation set performance",
                           do_points=False, grid_linewidth=0.1)
