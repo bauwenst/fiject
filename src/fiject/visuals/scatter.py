@@ -60,7 +60,7 @@ class ScatterPlot(Diagram):
         size: float = 35
 
     def commitWithArgs(self, diagram_options: ArgsGlobal, default_family_options: ArgsPerFamily, extra_family_options: Dict[str,ArgsPerFamily]=None,
-                       only_for_return=False):
+                       export_mode: ExportMode=ExportMode.SAVE_ONLY):
         do = diagram_options
         with ProtectedData(self):
             if extra_family_options is None:
@@ -122,9 +122,9 @@ class ScatterPlot(Diagram):
             if do.legend:
                 ax.legend(scatters, names, loc='upper left', markerscale=10, ncol=2)  # https://stackoverflow.com/questions/17411940/matplotlib-scatter-plot-legend
 
-            if not only_for_return:
-                self.exportToPdf(fig)
-            return fig, ax
+            self.exportToPdf(fig, export_mode)
+            if export_mode != ExportMode.SAVE_ONLY:
+                return fig, ax
 
 
 class ScatterPlot_DiscreteContinuous(ScatterPlot):

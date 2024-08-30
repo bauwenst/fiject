@@ -83,7 +83,7 @@ class LineGraph(Diagram):
                do_points=True, do_lines=True, initial_style_idx=0,
                grid_linewidth=None, curve_linewidth=1, optional_line_at_y=None,
                y_lims=None, x_tickspacing=None, y_tickspacing=None, logx=False, logy=False,
-               only_for_return=False, existing_figax: tuple=None):
+               export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
         self.commitWithArgs(
             diagram_options=LineGraph.ArgsGlobal(
                 aspect_ratio=aspect_ratio,
@@ -104,11 +104,12 @@ class LineGraph(Diagram):
                 show_points=do_points,
                 show_line=do_lines
             ),
-            only_for_return=only_for_return, existing_figax=existing_figax
+            export_mode=export_mode,
+            existing_figax=existing_figax
         )
 
     def commitWithArgs(self, diagram_options: ArgsGlobal, default_line_options: ArgsPerLine, extra_line_options: Dict[str,ArgsPerLine]=None,
-                       only_for_return=False, existing_figax: tuple=None):
+                       export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
         """
         Render a figure based on the added data.
         Also stores the data to a JSON file (see save()).
@@ -203,9 +204,9 @@ class LineGraph(Diagram):
             if diagram_options.y_lims:  # Yes, twice. Don't ask.
                 main_ax.set_ylim(diagram_options.y_lims[0], diagram_options.y_lims[1])
 
-            if not only_for_return:
-                self.exportToPdf(fig)
-            return fig, main_ax
+            self.exportToPdf(fig, export_mode)
+            if export_mode != ExportMode.SAVE_ONLY:
+                return fig, main_ax
 
     def merge_commit(self, fig, ax1, other_graph: "LineGraph", **second_commit_kwargs):
         """
@@ -228,7 +229,7 @@ class LineGraph(Diagram):
 
         # Modify ax2 in-place.
         other_graph.commit(**second_commit_kwargs, existing_figax=(fig,ax2),
-                           initial_style_idx=len(self.data), only_for_return=True)
+                           initial_style_idx=len(self.data), export_mode=ExportMode.RETURN_ONLY)
 
         # Drawing the legends is slightly tricky, see https://stackoverflow.com/a/54631364/9352077
         legend_1 = ax1.legend(loc='upper right')
@@ -407,7 +408,7 @@ class StochasticLineGraph(Diagram):
         self.data[series_name][index_of_x][2].append(weight)
 
     def commit(self, diagram_options: ArgsGlobal, default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine]=None,
-               only_for_return=False, existing_figax: tuple=None):
+               export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
         with ProtectedData(self):
             if extra_line_options is None:
                 extra_line_options = dict()
@@ -467,8 +468,8 @@ class StochasticLineGraph(Diagram):
                     new_line_options[name] = options
 
             fig, main_ax = overlay_graph.commitWithArgs(diagram_options, default_line_options, new_line_options,
-                                                        only_for_return=True, existing_figax=(fig, main_ax))
+                                                        export_mode=ExportMode.RETURN_ONLY, existing_figax=(fig, main_ax))
 
-            if not only_for_return:
-                self.exportToPdf(fig)
-            return fig, main_ax
+            self.exportToPdf(fig, export_mode)
+            if export_mode != ExportMode.SAVE_ONLY:
+                return fig, main_ax

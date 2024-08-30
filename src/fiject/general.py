@@ -91,6 +91,17 @@ class CacheMode(Enum):
     IF_MISSING = 4
 
 
+class ExportMode(Enum):
+    """
+    Matplotlib keeps figures in memory unless they are destroyed explicitly. We allow users to get Matplotlib objects
+    when they commit a diagram, but then the user has to destroy them themselves. When they don't need the objects and
+    just want the export, we destroy the figure for them.
+    """
+    SAVE_ONLY = 1
+    RETURN_ONLY = 2
+    SAVE_AND_RETURN = 3
+
+
 class Diagram(ABC):
 
     def __init__(self, name: str, caching: CacheMode=CacheMode.NONE, overwriting: bool=False):
@@ -194,8 +205,11 @@ class Diagram(ABC):
 
     ### IMPLEMENTATIONS
 
-    def exportToPdf(self, fig, stem_suffix: str=""):
-        Diagram.writeFigure(stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, figure=fig, overwrite_if_possible=self.overwrite)
+    def exportToPdf(self, fig, export_mode: ExportMode=ExportMode.SAVE_ONLY, stem_suffix: str=""):
+        if export_mode != ExportMode.RETURN_ONLY:  # if export_mode != don't save
+            Diagram.writeFigure(stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, figure=fig, overwrite_if_possible=self.overwrite)
+        if export_mode == ExportMode.SAVE_ONLY:  # if export_mode == don't return
+            plt.close(fig)
 
     def save(self, metadata: dict=None):
         Diagram.writeData(stem=self.name, data={

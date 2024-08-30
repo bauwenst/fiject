@@ -212,7 +212,7 @@ class Table(Diagram):
     def commit(self, rowname_alignment="l",
                borders_between_columns_of_level: List[int]=None, borders_between_rows_of_level: List[int]=None,
                default_column_style: ColumnStyle=None, alternate_column_styles: Dict[Tuple[str,...], ColumnStyle]=None,
-               do_hhline_syntax=True, do_align_ampersands=True, body_only: bool=False, only_for_return: bool=False):  # TODO: Needs to replace any & in col/row names by \&.
+               do_hhline_syntax=True, do_align_ampersands=True, body_only: bool=False, export_mode: ExportMode=ExportMode.SAVE_ONLY):  # TODO: Needs to replace any & in col/row names by \&.
         """
         :param rowname_alignment: How to align row names (choose between "l", "c" and "r").
         :param borders_between_columns_of_level: List of layer indices that cause vertical lines to be drawn in the table
@@ -474,12 +474,12 @@ class Table(Diagram):
             content_lines = Table._prefixWithTabs(content_lines)
             all_lines = first_line + "\n" + content_lines + "\n" + last_line
 
-            if not only_for_return:
+            if export_mode != ExportMode.RETURN_ONLY:
                 print(f"Writing .tex {self.name} ...")
                 with open(PathHandling.getSafePath(PathHandling.getProductionFolder(), self.name, ".tex"), "w") as file:
                     file.write(all_lines)
-
-            return all_lines
+            if export_mode != ExportMode.SAVE_ONLY:
+                return all_lines
 
     @staticmethod
     def _alignAmpersands(tablebody: str):
