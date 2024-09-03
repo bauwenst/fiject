@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 from .defaults import FIJECT_DEFAULTS, niceColours, cycleNiceColours, cycleRainbowColours
 
 
-def newFigAx(aspect_ratio: Optional[Tuple[float,float]]) -> Tuple[plt.Figure, plt.Axes]:
+AspectRatio = Tuple[float,float]
+def newFigAx(aspect_ratio: Optional[AspectRatio]) -> Tuple[plt.Figure, plt.Axes]:
     if aspect_ratio is None:
         aspect_ratio = FIJECT_DEFAULTS.ASPECT_RATIO
     return plt.subplots(figsize=(FIJECT_DEFAULTS.ASPECT_RATIO_SIZEUP * aspect_ratio[0], FIJECT_DEFAULTS.ASPECT_RATIO_SIZEUP * aspect_ratio[1]))

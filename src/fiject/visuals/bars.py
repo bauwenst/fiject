@@ -135,9 +135,7 @@ class HistoBars(Diagram):
 
         self.data[family].append(y)
 
-    def commit(self, bar_width: float=1, center_ticks: bool=True, x_tickspacing: float=None, y_tickspacing: float=None,
-               sort_keyless_data=False, small_to_big=True,
-               x_label: str="", y_label: str="", log_y=False, grid=True, aspect_ratio=None):
+    def commitWithArgs(self, global_args: ArgsGlobal):
         """
         Based on
         https://stackoverflow.com/questions/62021334/barplot-in-seaborn-with-height-based-on-an-array
@@ -145,7 +143,7 @@ class HistoBars(Diagram):
         https://stackoverflow.com/questions/58963320/bar-plot-with-irregular-spacing
         """
         with ProtectedData(self):
-            fig, main_ax = newFigAx(aspect_ratio)
+            fig, main_ax = newFigAx(global_args.aspect_ratio)
 
             # TODO: would be nice to have opacity as in
             #     https://seaborn.pydata.org/generated/seaborn.objects.Bars.html
@@ -153,47 +151,30 @@ class HistoBars(Diagram):
             for family, data in self.data.items():
                 if isinstance(data, list):
                     x_values = range(len(data))
-                    y_values = data if not sort_keyless_data else sorted(data, reverse=not small_to_big)
+                    y_values = data if not global_args.sort_keyless_data else sorted(data, reverse=not global_args.small_to_big)
                 elif isinstance(data, dict):
                     x_values, y_values = zip(*data.items())
 
-                main_ax.bar(x_values, y_values, width=bar_width, align="center" if center_ticks else "edge", color=next(colours),
+                main_ax.bar(x_values, y_values, width=global_args.bar_width, align="center" if global_args.center_ticks else "edge", color=next(colours),
                            label=family)  # For the legend
 
-            if x_tickspacing:  # set_xticks needs a minimum, which we don't want as usual. Also, bars have their own way of setting ticks: https://stackoverflow.com/questions/64196514/bar-plot-only-shows-the-last-tick-label
-                main_ax.xaxis.set_major_locator(tkr.MultipleLocator(x_tickspacing))
+            if global_args.x_tickspacing:  # set_xticks needs a minimum, which we don't want as usual. Also, bars have their own way of setting ticks: https://stackoverflow.com/questions/64196514/bar-plot-only-shows-the-last-tick-label
+                main_ax.xaxis.set_major_locator(tkr.MultipleLocator(global_args.x_tickspacing))
                 main_ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
 
-            if y_tickspacing:
-                main_ax.yaxis.set_major_locator(tkr.MultipleLocator(y_tickspacing))
+            if global_args.y_tickspacing:
+                main_ax.yaxis.set_major_locator(tkr.MultipleLocator(global_args.y_tickspacing))
                 main_ax.yaxis.set_major_formatter(tkr.ScalarFormatter())
 
-            main_ax.set_xlabel(x_label)
-            main_ax.set_ylabel(y_label)
-            if log_y:
+            main_ax.set_xlabel(global_args.x_label)
+            main_ax.set_ylabel(global_args.y_label)
+            if global_args.log_y:
                 main_ax.set_yscale("log")
 
             # Grid
-            if grid:
+            if global_args.grid:
                 main_ax.set_axisbelow(True)  # Put grid behind the bars.
                 main_ax.grid(True, axis="y", linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
             main_ax.legend()
 
             self.exportToPdf(fig)
-
-    def commitWithArgs(self, global_args: ArgsGlobal):
-        return self.commit(
-            sort_keyless_data=global_args.sort_keyless_data,
-            small_to_big=global_args.small_to_big,
-
-            bar_width=global_args.bar_width,
-            center_ticks=global_args.center_ticks,
-
-            aspect_ratio=global_args.aspect_ratio,
-            grid=global_args.grid,
-            x_tickspacing=global_args.x_tickspacing,
-            x_label=global_args.x_label,
-            y_tickspacing=global_args.y_tickspacing,
-            y_label=global_args.y_label,
-            log_y=global_args.log_y
-        )

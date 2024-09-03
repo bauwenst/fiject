@@ -1,11 +1,14 @@
+from collections import defaultdict
+
 from ..general import *
 from .scatter import ScatterPlot
 
 from dataclasses import dataclass
 
 import math
-import pandas as pd
 import scipy
+import warnings
+import pandas as pd
 from natsort import natsorted
 
 import seaborn as sns
@@ -61,7 +64,7 @@ class MultiHistogram(Diagram):
         fill_colour: str = None  # Note: colour=None means "use default colour", not "use no colour".
         do_hatch: bool = False
 
-        aspect_ratio: Tuple[float,float] = None
+        aspect_ratio: AspectRatio = None
         x_lims: Tuple[Optional[int], Optional[int]] = None
         x_label: str = ""
         y_label: str = ""
@@ -194,7 +197,7 @@ class MultiHistogram(Diagram):
         iqr_limit: float=1.5
         sort_classes: bool=True
 
-        aspect_ratio: Tuple[float,float]=None
+        aspect_ratio: AspectRatio=None
         horizontal: bool=False
         log: bool=False
         value_tickspacing: float=None
@@ -333,10 +336,273 @@ class Histogram(MultiHistogram):
                 y_tickspacing=tickspacing
             ),
             ScatterPlot.ArgsPerFamily(size=15),
-            only_for_return = True
+            export_mode=ExportMode.RETURN_ONLY
         )
         ax.axline(xy1=(0,0), slope=1.0, color="red", zorder=1, alpha=1.0, linewidth=0.75)
         self.exportToPdf(fig, stem_suffix="_qqplot")
 
         # Doing it with scipy is more complicated because you need to fit your data to your random variable first
         # (which gives you a FitResult object that has a .plot("qq") method) ... so I'm not going to do that!
+
+
+@dataclass
+class BinSpec:
+
+    min: float  # Always defined
+    width: float  # Always defined
+
+    max: float=None
+    amount: int=None
+
+    @staticmethod
+    def halfopen(minimum: float, width: float):
+        return BinSpec(
+            min=minimum,
+            width=width
+        )
+
+    @staticmethod
+    def closedFromWidth(minimum: float, maximum: float, width: float):
+        n_bins_float = (maximum - minimum) / width
+        n_bins_int   = round(n_bins_float)
+        if abs(n_bins_float - n_bins_int) > 1e-6:
+            raise ValueError(f"Cannot divide a range of size {maximum - minimum} into an integer amount of bins of width {width}.")
+
+        return BinSpec(
+            min=minimum,
+            max=maximum,
+            width=width,
+            amount=n_bins_int
+        )
+
+    @staticmethod
+    def closedFromAmount(minimum: float, maximum: float, amount: int):
+        return BinSpec(
+            min=minimum,
+            max=maximum,
+            width=(maximum - minimum)/amount,
+            amount=amount
+        )
+
+    def isClosed(self) -> bool:
+        return self.max is not None
+
+
+class _PrecomputedHistogram(Diagram):
+
+    @dataclass
+    class ArgsGlobal:
+        aspect_ratio: AspectRatio=None
+        x_tickspacing: float=None
+        x_label: str=""
+        x_center_ticks: bool=False
+        y_tickspacing: float=None
+        y_label: str=""
+
+        fill_colour: str=None
+        border_colour: str=None
+
+        relative_counts: bool=False
+        average_over_bin: bool=False
+
+        # do_kde: bool = True
+        # kde_smoothing: bool = True
+        # do_hatch: bool = False
+
+        # x_lims: Tuple[Optional[int], Optional[int]] = None
+        # log_x: bool = False
+        # log_y: bool = False
+
+
+    def _commitGivenBars(self, global_args: ArgsGlobal, bar_left_edges: List[float], bar_heights: List[float], closed_bin_spec: BinSpec,
+                         **seaborn_args):
+        if not closed_bin_spec.isClosed():
+            raise ValueError("Bin specification must be closed, but was open.")  # Only user-facing methods have to be exception-safe.
+
+        fig, ax = newFigAx(global_args.aspect_ratio)
+
+        if global_args.relative_counts:
+            if global_args.average_over_bin:
+                mode = "density"  # Total area is 1.
+            else:
+                mode = "percent"  # Total area is 100.
+        else:
+            if global_args.average_over_bin:
+                mode = "frequency"
+            else:
+                mode = "count"
+
+        sns.histplot(x=bar_left_edges, weights=bar_heights, binwidth=closed_bin_spec.width, binrange=(closed_bin_spec.min, closed_bin_spec.max), ax=ax,
+                     color=global_args.fill_colour, edgecolor=global_args.border_colour, stat=mode, discrete=global_args.x_center_ticks, **seaborn_args)
+
+        ax.set_xlabel(global_args.x_label)
+        ax.set_ylabel(global_args.y_label + r" [\%]" * (mode == "percent" and global_args.y_label != ""))
+
+        if global_args.x_tickspacing:
+            ax.xaxis.set_major_locator(tkr.MultipleLocator(global_args.x_tickspacing))
+            ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
+        if global_args.y_tickspacing:
+            ax.yaxis.set_major_locator(tkr.MultipleLocator(global_args.y_tickspacing))
+            ax.yaxis.set_major_formatter(tkr.ScalarFormatter())
+
+        ax.set_axisbelow(True)
+        ax.grid(True, axis="y", linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
+        self.exportToPdf(fig)
+
+
+class StreamingHistogram(_PrecomputedHistogram):
+    """
+    Histogram that has the buckets baked in from the start.
+    Say you have 1 billion data points that contribute to the histogram distribution. You can't store these in a list,
+    because it will have length 1 billion. Yet, you can still easily turn them into a histogram by having a small amount
+    of buckets N and just storing N integer counters that can become very large numbers which take a trivial amount of bits to store.
+
+    Cannot be made more fine-grained. Can be made more coarse-grained (10 bins can be turned into 5 bins unambiguously).
+
+    Not only supports big amounts of samples, but also big amounts of bins if their usage is sparse.
+    """
+
+    @dataclass
+    class ArgsGlobal(_PrecomputedHistogram.ArgsGlobal):
+        combine_buckets: int = 1
+
+    def __init__(self, name: str, binspec: BinSpec,
+                 caching: CacheMode=CacheMode.NONE, overwriting: bool=False):
+        self.bins = binspec
+        super().__init__(name=name, caching=caching, overwriting=overwriting)
+
+    def getBinIndex(self, value: float) -> int:
+        if value < self.bins.min or (self.bins.isClosed() and value > self.bins.max):
+            warnings.warn(f"Value {value} is not within the histogram range [{self.bins.min};{self.bins.max}] so it was dropped.")
+            return -1
+
+        if self.bins.isClosed() and value == self.bins.max:
+            return self.bins.amount-1
+
+        value -= self.bins.min
+        return int(value/self.bins.width)
+
+    def clear(self):
+        super().clear()
+        self.data["counts"] = dict()
+
+    def _load(self, saved_data: dict):
+        for bin_index,count in saved_data["counts"]:
+            self.data["counts"][int(bin_index)] = count
+
+    def add(self, value: float):
+        i = self.getBinIndex(value)
+        if i not in self.data["counts"]:
+            self.data["counts"][i] = 0
+
+        self.data["counts"][i] += 1
+
+    def commit(self, global_args: ArgsGlobal, **seaborn_args):
+        with ProtectedData(self):
+            # First of all: find the last non-empty bin. Even if the binspec says the bin set is half-open, you have to close it when visualising!
+            if not self.bins.isClosed():
+                n_actual_bins = 1 + (max(self.data["counts"])-1) // global_args.combine_buckets
+            else:  # For closed intervals, you cannot pretend there are more bins to the right to make groups of equal size.
+                # TODO: What you could do, however, is check that max(self.data["counts"]) is far enough from the end of the interval to pretend that the interval is actually a bit shorter.
+                if self.bins.amount % global_args.combine_buckets != 0:
+                    raise ValueError(f"Cannot group {self.bins.amount} buckets in groups of {global_args.combine_buckets} without unfair treatment of the last bucket.")
+                n_actual_bins = self.bins.amount // global_args.combine_buckets
+
+            new_bins = BinSpec.closedFromAmount(self.bins.min, n_actual_bins*global_args.combine_buckets*self.bins.width, n_actual_bins)
+
+            # Compute counts in these new bins
+            values_per_bin = defaultdict(list)
+            for original_bin_index,count in self.data["counts"].items():  # Note: the edge effect of a sample being  is already covered by this.
+                bin_index = original_bin_index // global_args.combine_buckets
+                values_per_bin[bin_index].append(count)
+
+            values_per_bin = {k: sum(v) for k,v in values_per_bin.items()}
+
+            # Translate bin indices to their left edges
+            xs = []
+            ys = []
+            for bin_index,count in values_per_bin.items():
+                xs.append(new_bins.min + new_bins.width*bin_index)
+                ys.append(count)
+
+            self._commitGivenBars(global_args, xs, ys, closed_bin_spec=new_bins, **seaborn_args)
+
+
+class VariableGranularityHistogram(_PrecomputedHistogram):
+    """
+    Histogram used for combining measurements made for multiple discrete domains that have the same range but a different
+    granularity.
+
+    For example, let's say you have a problem where you are given trees with a variable depth, and then you select one particular
+    node in each tree. You now want to visualise the depth distribution of these nodes, with the top node having depth 0.0 and
+    the furthest descendant of your selected node having depth 1.0. Even though every selected node has a depth between 0.0 and 1.0
+    this way, depths are still discretised, and that's a problem: in a tree with the longest root-to-leaf path having 3 nodes, the
+    only depth values you can have are 0.0, 0.5 and 1.0. Meanwhile, if the longest path had 4 nodes, the depth values on it would be
+    0.0, 0.33, 0.67, and 1.0. For 6 nodes, it would be 0.0, 0.20, 0.40, 0.60, 0.80, 1.0. If you were to use a small bin width,
+    the 3-high trees could only ever add to the first bin, the last bin, and the middle bin, and never contribute anything to
+    all the other bins. Now imagine that for all trees (no matter the size), the frequency of being selected goes down with a node's
+    depth. What you would like to see is exactly that taper in the histogram. Say that the 3-high trees appear most often, then you
+    will NOT see a nice taper, but instead, the histograms would have three big spikes with smaller bars in between, completely
+    losing the tapered shape.
+
+    Instead, one sample of 0.5 in a 3-high tree should be SPREAD equally across all bins between 0.5-1/6 and 0.5+1/6. More
+    formally: given that we want a histogram of N bins in the range [0.0, 1.0] and that the next sample comes from n possible
+    values {0, 1, ..., n-2, n-1}, then one sampled value i contributes a uniform weight that sums to 1 to bin indices
+    floor(i/n*N)th ... floor((i+1)/n*N)th (exclusive bound, otherwise the latter bin is included for i as the last and for i+1 as the first bucket).
+    For example: if n == 3 and N == 20, then i == 1 contributes equally to bins i/n*N == 1/3*20 == 6 ... (i+1)/n*N == 2/3*20 == 13 exc,
+    which is 7 bins total.
+    Another example: if n == 50 and N = 3, then i == 49 contributes equally to bins floor(49/50*3) == floor(2.94) == 2 to 3 (exclusive),
+    which is only 1 bin, namely the last one.
+    """
+
+    @dataclass
+    class ArgsGlobal(_PrecomputedHistogram.ArgsGlobal):
+        x_min: float=0.0
+        x_max: float=1.0
+        n_bins: int=10
+
+    def clear(self):
+        super().clear()
+        self.data["domains"] = dict()
+
+    def _load(self, saved_data: dict):
+        for n,xs in saved_data["domain"].items():
+            self.data[int(n)] = xs
+
+    def add(self, i: int, n: int):
+        """
+        Add a sample i from a domain {0, 1, 2, ..., n-1}.
+        """
+        if n not in self.data["domains"]:
+            self.data["domains"][n] = []
+
+        self.data["domains"][n].append(i)
+
+    def commit(self, global_args: ArgsGlobal, **seaborn_args):
+        with ProtectedData(self):
+            N = global_args.n_bins
+            bin_to_height = defaultdict(float)
+
+            for n,xs in self.data["domains"].items():
+                for i in xs:
+                    lower_bin = int(N * i/n)      # At most N-1
+                    upper_bin = int(N * (i+1)/n)  # At most N, in the one case of i == n-1.
+
+                    if lower_bin == upper_bin:  # Happens when your data bins are smaller than your final bins.
+                        upper_bin += 1
+
+                    n_bins = upper_bin - lower_bin
+                    for b in range(n_bins):
+                        bin_to_height[lower_bin+b] += 1/n_bins
+
+            # Convert the bins (up to N of them) to horizontal coordinates.
+            visual_range = BinSpec.closedFromAmount(minimum=global_args.x_min, maximum=global_args.x_max, amount=N)
+
+            xs = []
+            ys = []
+            for bin_index, count in bin_to_height.items():
+                xs.append(visual_range.min + visual_range.width*bin_index)
+                ys.append(count)
+
+            # Commit
+            self._commitGivenBars(global_args, xs, ys, closed_bin_spec=visual_range, **seaborn_args)
