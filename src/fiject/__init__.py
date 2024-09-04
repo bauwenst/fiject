@@ -1,6 +1,6 @@
 from .general import CacheMode, ExportMode
 from .visuals.graphs import LineGraph, MergedLineGraph, StochasticLineGraph
-from .visuals.histos import MultiHistogram, Histogram
+from .visuals.histos import MultiHistogram, Histogram, StreamingHistogram, VariableGranularityHistogram, BinSpec
 from .visuals.bars import Bars, HistoBars
 from .visuals.scatter import ScatterPlot, ScatterPlot_DiscreteContinuous
 from .visuals.tables import Table, ColumnStyle
@@ -9,7 +9,7 @@ from .defaults import setFijectOutputFolder, FIJECT_DEFAULTS
 __all__ = ["LineGraph", "MergedLineGraph",
            "Bars", "HistoBars",
            "ScatterPlot", "ScatterPlot_DiscreteContinuous",
-           "MultiHistogram", "Histogram",
+           "MultiHistogram", "Histogram", "StreamingHistogram", "VariableGranularityHistogram", "BinSpec",
            "Table", "ColumnStyle",
            "CacheMode", "ExportMode", "setFijectOutputFolder", "FIJECT_DEFAULTS"]  # What will be imported by 'from fiject import *'
 

@@ -135,7 +135,7 @@ class HistoBars(Diagram):
 
         self.data[family].append(y)
 
-    def commitWithArgs(self, global_args: ArgsGlobal):
+    def commit(self, global_args: ArgsGlobal):
         """
         Based on
         https://stackoverflow.com/questions/62021334/barplot-in-seaborn-with-height-based-on-an-array

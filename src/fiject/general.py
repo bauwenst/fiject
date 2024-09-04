@@ -248,6 +248,22 @@ class Diagram(ABC):
         self.data = dict()
         self.cache = dict()
 
+    def isEmpty(self) -> bool:
+        return Diagram._isEmpty(self.data)
+
+    @staticmethod
+    def _isEmpty(iterable: Iterable) -> bool:
+        if isinstance(iterable, str):  # Strings have to be treated specially because a 1-character string returns itself when iterating over it.
+            return len(iterable) == 0
+
+        for value in (iterable.values() if isinstance(iterable, dict) else iterable):
+            if not isinstance(value, Iterable):  # Found a value by iterating that is not an iterable itself. That's non-emptiness!
+                return False
+            elif not Diagram._isEmpty(value):  # Found a value that is an iterable and it isn't empty itself.
+                return False
+
+        return True  # All values were empty iterables.
+
     def _save(self) -> dict:
         """
         Serialise the object.
@@ -291,18 +307,21 @@ class ProtectedData:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:  # EXITED WITH ERROR!
+            SEP = "="*50
+            print(SEP)
+            print(f"Error writing figure '{self.protected_figure.name}'. Often that's a LaTeX issue (illegal characters somewhere?).")
+
             if not self.protected_figure.will_be_stored:  # If it hasn't been stored already: do it now.
                 self.protected_figure.save(metadata=self.metadata)
 
-            print(f"Error writing figure '{self.protected_figure.name}'. Often that's a LaTeX issue (illegal characters somewhere?). ")
             print(f"Don't panic: your datapoints were cached, but you may have to go into the JSON to fix things.")
             print("Here's the exception, FYI:")
-            print("==========================")
+            print(SEP)
             time.sleep(0.5)
             import traceback
             traceback.print_exception(exc_type, exc_val, exc_tb)
             time.sleep(0.5)
-            print("==========================")
+            print(SEP)
 
         # Swallow exception
         return True

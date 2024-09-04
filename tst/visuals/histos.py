@@ -1,4 +1,5 @@
 from tst.preamble import *
+import time
 
 from fiject.visuals.histos import StreamingHistogram, BinSpec, VariableGranularityHistogram
 
@@ -6,7 +7,7 @@ from fiject.visuals.histos import StreamingHistogram, BinSpec, VariableGranulari
 def test_streaming():
     samples = [1,4,9,16,25,36,49,64,81,100]  # Histogram: 4, 2, 1, 1, 2
 
-    histo = StreamingHistogram("test-histo_streaming", BinSpec.halfopen(minimum=0, width=20))
+    histo = StreamingHistogram("test-histo_streaming_" + time.strftime("%H%M%S"), BinSpec.halfopen(minimum=0, width=20))
     for sample in samples:
         histo.add(sample)
 
@@ -22,7 +23,7 @@ def test_streaming():
 
 
 def test_granularity():
-    histo = VariableGranularityHistogram("test-histo_vg")
+    histo = VariableGranularityHistogram("test-histo_vg_" + time.strftime("%H%M%S"))
 
     histo.add(1,3)
     histo.commit(VariableGranularityHistogram.ArgsGlobal(

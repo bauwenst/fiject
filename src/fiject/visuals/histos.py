@@ -413,11 +413,12 @@ class _PrecomputedHistogram(Diagram):
         # log_x: bool = False
         # log_y: bool = False
 
-
     def _commitGivenBars(self, global_args: ArgsGlobal, bar_left_edges: List[float], bar_heights: List[float], closed_bin_spec: BinSpec,
-                         **seaborn_args):
+                         disable_memory_safety: bool=False, **seaborn_args):
         if not closed_bin_spec.isClosed():
             raise ValueError("Bin specification must be closed, but was open.")  # Only user-facing methods have to be exception-safe.
+        if not disable_memory_safety and closed_bin_spec.amount > 10**9:
+            raise ValueError(f"Requested drawing {closed_bin_spec.amount} bins, which is likely too many without crashing your machine.\nEither reduce the amount of bins or disable memory safety at your own risk.")
 
         fig, ax = newFigAx(global_args.aspect_ratio)
 
@@ -437,6 +438,11 @@ class _PrecomputedHistogram(Diagram):
 
         ax.set_xlabel(global_args.x_label)
         ax.set_ylabel(global_args.y_label + r" [\%]" * (mode == "percent" and global_args.y_label != ""))
+
+        if global_args.x_center_ticks:
+            ax.set_xlim(closed_bin_spec.min - closed_bin_spec.width*0.995, closed_bin_spec.max - 0.005*closed_bin_spec.width)
+        else:
+            ax.set_xlim(closed_bin_spec.min - closed_bin_spec.width/2, closed_bin_spec.max + closed_bin_spec.width/2)
 
         if global_args.x_tickspacing:
             ax.xaxis.set_major_locator(tkr.MultipleLocator(global_args.x_tickspacing))
@@ -471,17 +477,6 @@ class StreamingHistogram(_PrecomputedHistogram):
         self.bins = binspec
         super().__init__(name=name, caching=caching, overwriting=overwriting)
 
-    def getBinIndex(self, value: float) -> int:
-        if value < self.bins.min or (self.bins.isClosed() and value > self.bins.max):
-            warnings.warn(f"Value {value} is not within the histogram range [{self.bins.min};{self.bins.max}] so it was dropped.")
-            return -1
-
-        if self.bins.isClosed() and value == self.bins.max:
-            return self.bins.amount-1
-
-        value -= self.bins.min
-        return int(value/self.bins.width)
-
     def clear(self):
         super().clear()
         self.data["counts"] = dict()
@@ -497,32 +492,57 @@ class StreamingHistogram(_PrecomputedHistogram):
 
         self.data["counts"][i] += 1
 
-    def commit(self, global_args: ArgsGlobal, **seaborn_args):
+    def getBinIndex(self, value: float) -> int:
+        if value < self.bins.min or (self.bins.isClosed() and value > self.bins.max):
+            warnings.warn(f"Value {value} is not within the histogram range [{self.bins.min};{self.bins.max}] so it was dropped.")
+            return -1
+
+        if self.bins.isClosed() and value == self.bins.max:
+            return self.bins.amount-1
+
+        value -= self.bins.min
+        return int(value/self.bins.width)
+
+    def commit(self, global_args: ArgsGlobal, bin_reweighting: Dict[int,float]=None, **seaborn_args):
+        """
+        :param bin_reweighting: multipliers to apply to the counts in the original bins.
+                                Normally, in histograms, it is samples that are weighted, but since a StreamingHistogram
+                                is made to throw away samples, you can only weight bins (equivalent to weighting all the
+                                samples in that bin by the same weight).
+        """
         with ProtectedData(self):
+            if bin_reweighting is None:
+                bin_reweighting = dict()
+
             # First of all: find the last non-empty bin. Even if the binspec says the bin set is half-open, you have to close it when visualising!
             if not self.bins.isClosed():
-                n_actual_bins = 1 + (max(self.data["counts"])-1) // global_args.combine_buckets
+                if self.isEmpty():
+                    warnings.warn("Your histogram has no upper bound and no data to deduce it from. Nothing will be drawn.")
+                    return
+
+                n_original_bins = max(self.data["counts"]) + 1  # if n is the last bin, you have bin 0, 1, 2, 3, ..., n-1, n, which is n+1 bins.
+                n_actual_bins = 1 + (n_original_bins-1) // global_args.combine_buckets
             else:  # For closed intervals, you cannot pretend there are more bins to the right to make groups of equal size.
                 # TODO: What you could do, however, is check that max(self.data["counts"]) is far enough from the end of the interval to pretend that the interval is actually a bit shorter.
                 if self.bins.amount % global_args.combine_buckets != 0:
                     raise ValueError(f"Cannot group {self.bins.amount} buckets in groups of {global_args.combine_buckets} without unfair treatment of the last bucket.")
                 n_actual_bins = self.bins.amount // global_args.combine_buckets
 
-            new_bins = BinSpec.closedFromAmount(self.bins.min, n_actual_bins*global_args.combine_buckets*self.bins.width, n_actual_bins)
+            new_bins = BinSpec.closedFromAmount(minimum=self.bins.min, maximum=(1+n_actual_bins)*global_args.combine_buckets*self.bins.width, amount=n_actual_bins)
 
             # Compute counts in these new bins
             values_per_bin = defaultdict(list)
             for original_bin_index,count in self.data["counts"].items():  # Note: the edge effect of a sample being  is already covered by this.
-                bin_index = original_bin_index // global_args.combine_buckets
-                values_per_bin[bin_index].append(count)
+                new_bin_index = original_bin_index // global_args.combine_buckets
+                values_per_bin[new_bin_index].append(count * bin_reweighting.get(original_bin_index, 1))
 
             values_per_bin = {k: sum(v) for k,v in values_per_bin.items()}
 
             # Translate bin indices to their left edges
             xs = []
             ys = []
-            for bin_index,count in values_per_bin.items():
-                xs.append(new_bins.min + new_bins.width*bin_index)
+            for new_bin_index,count in values_per_bin.items():
+                xs.append(new_bins.min + new_bins.width*new_bin_index)
                 ys.append(count)
 
             self._commitGivenBars(global_args, xs, ys, closed_bin_spec=new_bins, **seaborn_args)
