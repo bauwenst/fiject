@@ -1,23 +1,23 @@
 from tst.preamble import *
 import time
 
-from fiject.visuals.histos import StreamingHistogram, BinSpec, VariableGranularityHistogram
+from fiject.visuals.histos import StreamingMultiHistogram, BinSpec, VariableGranularityHistogram
 
 
 def test_streaming():
-    samples = [1,4,9,16,25,36,49,64,81,100]  # Histogram: 4, 2, 1, 1, 2
+    samples = [1,4,9,16,25,36,49,64,81,100]  # Histogram if closed: 4, 2, 1, 1, 2. Histogram if open: 4, 2, 1, 1, 1, 1.
 
-    histo = StreamingHistogram("test-histo_streaming_" + time.strftime("%H%M%S"), BinSpec.halfopen(minimum=0, width=20))
+    histo = StreamingMultiHistogram("test-histo_streaming_" + time.strftime("%H%M%S"), BinSpec.halfopen(minimum=0, width=20))
     for sample in samples:
-        histo.add(sample)
+        histo.add("series 1", sample)
 
     print(histo.data)
 
-    histo.commit(StreamingHistogram.ArgsGlobal(
+    histo.commit(StreamingMultiHistogram.ArgsGlobal(
         y_tickspacing=1,
         combine_buckets=1
     ))
-    histo.commit(StreamingHistogram.ArgsGlobal(
+    histo.commit(StreamingMultiHistogram.ArgsGlobal(
         combine_buckets=2
     ))
 
@@ -46,5 +46,5 @@ def test_granularity():
 
 
 if __name__ == "__main__":
-    # test_streaming()
-    test_granularity()
+    test_streaming()
+    # test_granularity()

@@ -15,6 +15,8 @@ import seaborn as sns
 import matplotlib.legend as lgd  # Only for type-checking.
 import matplotlib.ticker as tkr
 
+from ..util.iterables import cat
+
 
 class MultiHistogram(Diagram):
     """
@@ -388,7 +390,24 @@ class BinSpec:
         return self.max is not None
 
 
-class _PrecomputedHistogram(Diagram):
+@dataclass
+class BinOverlapMode(Enum):
+    OVERLAY = 1
+    STACK = 2
+    SIDE_BY_SIDE = 3
+
+    def toString(self) -> str:
+        if self == BinOverlapMode.OVERLAY:
+            return "layer"
+        elif self == BinOverlapMode.STACK:
+            return "stack"
+        elif self == BinOverlapMode.SIDE_BY_SIDE:
+            return "dodge"
+        else:
+            raise RuntimeError()
+
+
+class _PrecomputedMultiHistogram(Diagram):
 
     @dataclass
     class ArgsGlobal:
@@ -401,6 +420,7 @@ class _PrecomputedHistogram(Diagram):
 
         fill_colour: str=None
         border_colour: str=None
+        histo_overlapping: BinOverlapMode = BinOverlapMode.OVERLAY
 
         relative_counts: bool=False
         average_over_bin: bool=False
@@ -413,7 +433,7 @@ class _PrecomputedHistogram(Diagram):
         # log_x: bool = False
         # log_y: bool = False
 
-    def _commitGivenBars(self, global_args: ArgsGlobal, bar_left_edges: List[float], bar_heights: List[float], closed_bin_spec: BinSpec,
+    def _commitGivenBars(self, global_args: ArgsGlobal, bar_left_edges: List[float], bar_heights: Dict[str,List[float]], closed_bin_spec: BinSpec,
                          disable_memory_safety: bool=False, **seaborn_args):
         if not closed_bin_spec.isClosed():
             raise ValueError("Bin specification must be closed, but was open.")  # Only user-facing methods have to be exception-safe.
@@ -433,12 +453,30 @@ class _PrecomputedHistogram(Diagram):
             else:
                 mode = "count"
 
-        sns.histplot(x=bar_left_edges, weights=bar_heights, binwidth=closed_bin_spec.width, binrange=(closed_bin_spec.min, closed_bin_spec.max), ax=ax,
-                     color=global_args.fill_colour, edgecolor=global_args.border_colour, stat=mode, discrete=global_args.x_center_ticks, **seaborn_args)
+        classes = list(bar_heights.keys())
+        sns.histplot(
+            # Serialise the given data.
+            data={
+                "x": bar_left_edges*len(classes),
+                "h": cat(bar_heights[c] for c in classes),
+                FIJECT_DEFAULTS.LEGEND_TITLE_CLASS: cat([c]*len(bar_heights[c]) for c in classes)
+            }, x="x", weights="h", hue=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS,
+
+            # Configure bin computation.
+            binwidth=closed_bin_spec.width, binrange=(closed_bin_spec.min, closed_bin_spec.max), ax=ax,
+            stat=mode, discrete=global_args.x_center_ticks, common_norm=False,
+
+            # Visual parameters.
+            color=global_args.fill_colour, edgecolor=global_args.border_colour,
+            multiple=global_args.histo_overlapping.toString(), shrink=1 - 0.1*global_args.x_center_ticks,
+            **seaborn_args
+        )
 
         ax.set_xlabel(global_args.x_label)
         ax.set_ylabel(global_args.y_label + r" [\%]" * (mode == "percent" and global_args.y_label != ""))
+        ax.get_legend().set_title(None)  # Legend title is unnecessary clutter.
 
+        # TODO: Actually, it's not obvious that you want to scale the gap to the edges by the bar width. Big bars cause way too large gaps and analogous for small bars.
         if global_args.x_center_ticks:
             ax.set_xlim(closed_bin_spec.min - closed_bin_spec.width*0.995, closed_bin_spec.max - 0.005*closed_bin_spec.width)
         else:
@@ -456,9 +494,9 @@ class _PrecomputedHistogram(Diagram):
         self.exportToPdf(fig)
 
 
-class StreamingHistogram(_PrecomputedHistogram):
+class StreamingMultiHistogram(_PrecomputedMultiHistogram):
     """
-    Histogram that has the buckets baked in from the start.
+    MultiHistogram that has the buckets baked in from the start.
     Say you have 1 billion data points that contribute to the histogram distribution. You can't store these in a list,
     because it will have length 1 billion. Yet, you can still easily turn them into a histogram by having a small amount
     of buckets N and just storing N integer counters that can become very large numbers which take a trivial amount of bits to store.
@@ -469,7 +507,7 @@ class StreamingHistogram(_PrecomputedHistogram):
     """
 
     @dataclass
-    class ArgsGlobal(_PrecomputedHistogram.ArgsGlobal):
+    class ArgsGlobal(_PrecomputedMultiHistogram.ArgsGlobal):
         combine_buckets: int = 1
 
     def __init__(self, name: str, binspec: BinSpec,
@@ -477,20 +515,21 @@ class StreamingHistogram(_PrecomputedHistogram):
         self.bins = binspec
         super().__init__(name=name, caching=caching, overwriting=overwriting)
 
-    def clear(self):
-        super().clear()
-        self.data["counts"] = dict()
-
     def _load(self, saved_data: dict):
-        for bin_index,count in saved_data["counts"]:
-            self.data["counts"][int(bin_index)] = count
+        for class_name, counts in saved_data.items():
+            self.data[class_name] = dict()
+            for bin_index,count in counts.items():
+                self.data[class_name][int(bin_index)] = count
 
-    def add(self, value: float):
+    def add(self, class_name: str, value: float):
+        if class_name not in self.data:
+            self.data[class_name] = dict()
+
         i = self.getBinIndex(value)
-        if i not in self.data["counts"]:
-            self.data["counts"][i] = 0
+        if i not in self.data[class_name]:
+            self.data[class_name][i] = 0
 
-        self.data["counts"][i] += 1
+        self.data[class_name][i] += 1
 
     def getBinIndex(self, value: float) -> int:
         if value < self.bins.min or (self.bins.isClosed() and value > self.bins.max):
@@ -520,7 +559,7 @@ class StreamingHistogram(_PrecomputedHistogram):
                     warnings.warn("Your histogram has no upper bound and no data to deduce it from. Nothing will be drawn.")
                     return
 
-                n_original_bins = max(self.data["counts"]) + 1  # if n is the last bin, you have bin 0, 1, 2, 3, ..., n-1, n, which is n+1 bins.
+                n_original_bins = max(max(d.keys()) for d in self.data.values()) + 1  # if n is the index of the last bin, you have bin 0, 1, 2, 3, ..., n-1, n, which is n+1 bins.
                 n_actual_bins = 1 + (n_original_bins-1) // global_args.combine_buckets
             else:  # For closed intervals, you cannot pretend there are more bins to the right to make groups of equal size.
                 # TODO: What you could do, however, is check that max(self.data["counts"]) is far enough from the end of the interval to pretend that the interval is actually a bit shorter.
@@ -528,27 +567,30 @@ class StreamingHistogram(_PrecomputedHistogram):
                     raise ValueError(f"Cannot group {self.bins.amount} buckets in groups of {global_args.combine_buckets} without unfair treatment of the last bucket.")
                 n_actual_bins = self.bins.amount // global_args.combine_buckets
 
-            new_bins = BinSpec.closedFromAmount(minimum=self.bins.min, maximum=(1+n_actual_bins)*global_args.combine_buckets*self.bins.width, amount=n_actual_bins)
+            new_bins = BinSpec.closedFromAmount(minimum=self.bins.min, maximum=self.bins.min + n_actual_bins*global_args.combine_buckets*self.bins.width, amount=n_actual_bins)
 
-            # Compute counts in these new bins
-            values_per_bin = defaultdict(list)
-            for original_bin_index,count in self.data["counts"].items():  # Note: the edge effect of a sample being  is already covered by this.
-                new_bin_index = original_bin_index // global_args.combine_buckets
-                values_per_bin[new_bin_index].append(count * bin_reweighting.get(original_bin_index, 1))
+            # Compute counts in these new bins. Since we don't yet know which bins are used, do this in an unordered dictionary.
+            data_in_compressed_bins = dict()
+            nonzero_bins = set()
+            for class_name, counts in self.data.items():
+                data_in_compressed_bins[class_name] = defaultdict(float)
+                for original_bin_index, count in counts.items():
+                    new_bin_index = original_bin_index // global_args.combine_buckets
+                    data_in_compressed_bins[class_name][new_bin_index] += count * bin_reweighting.get(original_bin_index, 1)
+                    nonzero_bins.add(new_bin_index)
 
-            values_per_bin = {k: sum(v) for k,v in values_per_bin.items()}
+            # Convert the data to lists with a definite order.
+            bin_borders = []
+            serial_data = {class_name: [] for class_name in data_in_compressed_bins}
+            for new_bin_index in sorted(nonzero_bins):
+                bin_borders.append(new_bins.min + new_bins.width*new_bin_index)
+                for class_name, counts in data_in_compressed_bins.items():
+                    serial_data[class_name].append(counts[new_bin_index])  # Because 'counts' is a defaultdict, it will give you 0 when the bin is not present for this class.
 
-            # Translate bin indices to their left edges
-            xs = []
-            ys = []
-            for new_bin_index,count in values_per_bin.items():
-                xs.append(new_bins.min + new_bins.width*new_bin_index)
-                ys.append(count)
-
-            self._commitGivenBars(global_args, xs, ys, closed_bin_spec=new_bins, **seaborn_args)
+            self._commitGivenBars(global_args, bin_borders, serial_data, closed_bin_spec=new_bins, **seaborn_args)
 
 
-class VariableGranularityHistogram(_PrecomputedHistogram):
+class VariableGranularityHistogram(_PrecomputedMultiHistogram):
     """
     Histogram used for combining measurements made for multiple discrete domains that have the same range but a different
     granularity.
@@ -576,7 +618,7 @@ class VariableGranularityHistogram(_PrecomputedHistogram):
     """
 
     @dataclass
-    class ArgsGlobal(_PrecomputedHistogram.ArgsGlobal):
+    class ArgsGlobal(_PrecomputedMultiHistogram.ArgsGlobal):
         x_min: float=0.0
         x_max: float=1.0
         n_bins: int=10
@@ -625,4 +667,4 @@ class VariableGranularityHistogram(_PrecomputedHistogram):
                 ys.append(count)
 
             # Commit
-            self._commitGivenBars(global_args, xs, ys, closed_bin_spec=visual_range, **seaborn_args)
+            self._commitGivenBars(global_args, xs, {"": ys}, closed_bin_spec=visual_range, **seaborn_args)
