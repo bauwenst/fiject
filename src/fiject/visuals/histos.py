@@ -439,6 +439,12 @@ class _PrecomputedMultiHistogram(Diagram):
             raise ValueError("Bin specification must be closed, but was open.")  # Only user-facing methods have to be exception-safe.
         if not disable_memory_safety and closed_bin_spec.amount > 10**9:
             raise ValueError(f"Requested drawing {closed_bin_spec.amount} bins, which is likely too many without crashing your machine.\nEither reduce the amount of bins or disable memory safety at your own risk.")
+        if not bar_left_edges:
+            raise ValueError("No bar edges were given.")
+        if not bar_heights:
+            raise ValueError(f"No bars were given, even though bar edges were: {bar_left_edges}")
+        if not all(len(bar_left_edges) == len(bars) for bars in bar_heights.values()):
+            raise ValueError(f"Mismatch between amount of bar edges ({len(bar_left_edges)}) and amount of bars heights ({tuple(len(bars) for bars in bar_heights.values())}) given.")
 
         fig, ax = newFigAx(global_args.aspect_ratio)
 
@@ -460,7 +466,7 @@ class _PrecomputedMultiHistogram(Diagram):
                 "x": bar_left_edges*len(classes),
                 "h": cat(bar_heights[c] for c in classes),
                 FIJECT_DEFAULTS.LEGEND_TITLE_CLASS: cat([c]*len(bar_heights[c]) for c in classes)
-            }, x="x", weights="h", hue=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS,
+            }, x="x", weights="h", hue=FIJECT_DEFAULTS.LEGEND_TITLE_CLASS if len(bar_heights) > 1 else None,
 
             # Configure bin computation.
             binwidth=closed_bin_spec.width, binrange=(closed_bin_spec.min, closed_bin_spec.max), ax=ax,
@@ -472,9 +478,11 @@ class _PrecomputedMultiHistogram(Diagram):
             **seaborn_args
         )
 
+        if len(bar_heights) > 1:
+            ax.get_legend().set_title(None)  # Legend title is unnecessary clutter.
+
         ax.set_xlabel(global_args.x_label)
         ax.set_ylabel(global_args.y_label + r" [\%]" * (mode == "percent" and global_args.y_label != ""))
-        ax.get_legend().set_title(None)  # Legend title is unnecessary clutter.
 
         # TODO: Actually, it's not obvious that you want to scale the gap to the edges by the bar width. Big bars cause way too large gaps and analogous for small bars.
         if global_args.x_center_ticks:
