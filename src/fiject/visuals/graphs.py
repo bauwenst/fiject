@@ -19,6 +19,9 @@ class LineGraph(Diagram):
     @dataclass
     class ArgsGlobal:
         aspect_ratio: Tuple[float,float] = None
+        do_spines: bool=True
+        y_lims: Tuple[Optional[float], Optional[float]] = None
+
         x_label: str = ""
         y_label: str = ""
         legend_position: str = "lower right"
@@ -26,9 +29,12 @@ class LineGraph(Diagram):
         grid_linewidth: float = None
         curve_linewidth: float = 1
         optional_line_at_y: float = None
-        y_lims: Tuple[Optional[float], Optional[float]] = None
-        x_tickspacing: int = None
-        y_tickspacing: int = None
+
+        x_gridspacing: float = None
+        y_gridspacing: float = None
+        x_tickspacing: float = None
+        y_tickspacing: float = None
+        x_ticks_hardcoded: list = None
         logx: bool = False
         logy: bool = False
         tick_scientific_notation: bool = False  # Not 10 000 but 1*10^4.
@@ -187,6 +193,8 @@ class LineGraph(Diagram):
                 main_ax.set_xscale("log")
                 main_ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1,10)) if diagram_options.tick_log_multiples else [1]))
                 main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
+            elif diagram_options.x_ticks_hardcoded:
+                main_ax.xaxis.set_ticks(diagram_options.x_ticks_hardcoded, minor=False)
             elif diagram_options.x_tickspacing:
                 main_ax.xaxis.set_major_locator(tkr.MultipleLocator(diagram_options.x_tickspacing))
                 main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
@@ -203,6 +211,17 @@ class LineGraph(Diagram):
 
             if diagram_options.y_lims:  # Yes, twice. Don't ask.
                 main_ax.set_ylim(diagram_options.y_lims[0], diagram_options.y_lims[1])
+
+            if diagram_options.x_gridspacing or diagram_options.y_gridspacing:
+                if diagram_options.x_gridspacing:
+                    main_ax.xaxis.set_minor_locator(tkr.MultipleLocator(diagram_options.x_gridspacing))
+                if diagram_options.y_gridspacing:
+                    main_ax.yaxis.set_minor_locator(tkr.MultipleLocator(diagram_options.x_gridspacing))
+                main_ax.grid(True, which='minor', linewidth=diagram_options.grid_linewidth)
+
+            if not diagram_options.do_spines:
+                main_ax.spines['top'].set_visible(False)
+                main_ax.spines['right'].set_visible(False)
 
             self.exportToPdf(fig, export_mode)
             if export_mode != ExportMode.SAVE_ONLY:
