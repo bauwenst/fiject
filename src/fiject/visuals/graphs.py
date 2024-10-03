@@ -217,7 +217,7 @@ class LineGraph(Diagram):
                     main_ax.xaxis.set_minor_locator(tkr.MultipleLocator(diagram_options.x_gridspacing))
                 if diagram_options.y_gridspacing:
                     main_ax.yaxis.set_minor_locator(tkr.MultipleLocator(diagram_options.x_gridspacing))
-                main_ax.grid(True, which='minor', linewidth=diagram_options.grid_linewidth)
+                main_ax.grid(True, which='both', linewidth=diagram_options.grid_linewidth)
 
             if not diagram_options.do_spines:
                 main_ax.spines['top'].set_visible(False)

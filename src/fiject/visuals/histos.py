@@ -390,7 +390,6 @@ class BinSpec:
         return self.max is not None
 
 
-@dataclass
 class BinOverlapMode(Enum):
     OVERLAY = 1
     STACK = 2
