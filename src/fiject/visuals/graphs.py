@@ -39,6 +39,8 @@ class LineGraph(Diagram):
         logy: bool = False
         tick_scientific_notation: bool = False  # Not 10 000 but 1*10^4.
         tick_log_multiples: bool = False  # Instead of ticking 10^1, 10^2, 10^3... also tick 2*10^1, 3*10^1, 4*10^1...
+        
+        logx_becomes_linear_at: float = 0.0  # If this is changed to a non-zero number, a logarithmic x-axis will be cut off and mirrored around 0.
 
         functions: Dict[str,Callable[[float],float]] = None  # Functions you want to evaluate on-the-fly during a commit.
         function_samples: int = 100
@@ -164,6 +166,7 @@ class LineGraph(Diagram):
                 if not style:  # No point adding air to the legend.
                     continue
 
+                xs, ys = zip(*sorted(zip(xs,ys)))
                 if diagram_options.logx and diagram_options.logy:
                     main_ax.loglog(  xs, ys, style, c=colour, label=name, linewidth=diagram_options.curve_linewidth)
                 elif diagram_options.logx:
@@ -190,9 +193,12 @@ class LineGraph(Diagram):
             # FIXME: Known issue: you can't make 5 x 10^1 show as a tick label.
             #        I even found a SO post where the plot has exactly that issue: https://stackoverflow.com/q/49750107/9352077
             if diagram_options.logx:
-                main_ax.set_xscale("log")
-                main_ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1,10)) if diagram_options.tick_log_multiples else [1]))
-                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
+                if not diagram_options.logx_becomes_linear_at:
+                    main_ax.set_xscale("log")
+                    main_ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1, 10)) if diagram_options.tick_log_multiples else [1]))
+                    main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
+                else:
+                    main_ax.set_xscale("symlog", linthresh=diagram_options.logx_becomes_linear_at, linscale=0.5)
             elif diagram_options.x_ticks_hardcoded:
                 main_ax.xaxis.set_ticks(diagram_options.x_ticks_hardcoded, minor=False)
             elif diagram_options.x_tickspacing:

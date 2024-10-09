@@ -5,7 +5,7 @@ from .scatter import ScatterPlot
 
 from dataclasses import dataclass
 
-import math
+from math import floor, ceil, sqrt
 import scipy
 import warnings
 import pandas as pd
@@ -138,8 +138,8 @@ class MultiHistogram(Diagram):
             fig, ax = newFigAx(do.aspect_ratio)
             if not do.log_x:
                 sns.histplot(df, ax=ax, x="value", hue=legend_title,  # x and hue args: https://seaborn.pydata.org/tutorial/distributions.html
-                             binwidth=do.binwidth, binrange=(math.floor(df["value"].min() / do.binwidth) * do.binwidth,
-                                                             math.ceil(df["value"].max() / do.binwidth) * do.binwidth),
+                             binwidth=do.binwidth, binrange=(floor(df["value"].min() / do.binwidth) * do.binwidth,
+                                                             ceil(df["value"].max() / do.binwidth) * do.binwidth),
                              discrete=do.center_ticks, stat=mode, common_norm=False,
                              kde=do.do_kde, kde_kws={"bw_adjust": 10} if do.kde_smoothing else seaborn_args.pop("kde_kws", None),  # Btw, do not use displot: https://stackoverflow.com/a/63895570/9352077
                              color=do.fill_colour, edgecolor=do.border_colour,
@@ -515,6 +515,7 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
     Cannot be made more fine-grained. Can be made more coarse-grained (10 bins can be turned into 5 bins unambiguously).
 
     Not only supports big amounts of samples, but also big amounts of bins if their usage is sparse.
+    Also tracks the exact mean and standard deviation, despite not remembering the sample values.
     """
 
     @dataclass
@@ -526,23 +527,37 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
         self.bins = binspec
         super().__init__(name=name, caching=caching, overwriting=overwriting)
 
+    def clear(self):
+        super().clear()
+        self.data["$summaries"] = dict()
+
     def _load(self, saved_data: dict):
         for class_name, counts in saved_data.items():
+            if class_name == "$summaries":
+                self.data[class_name] = counts
+                continue
+
             self.data[class_name] = dict()
             for bin_index,count in counts.items():
                 self.data[class_name][int(bin_index)] = count
 
+        assert "$summaries" not in self.data or set(self.data["$summaries"]) == set(filter(lambda name: name != "$summaries", self.data.keys()))
+
     def add(self, class_name: str, value: float):
         if class_name not in self.data:
             self.data[class_name] = dict()
+            self.data["$summaries"][class_name] = [0,0,0]
 
-        i = self.getBinIndex(value)
+        i = self._getBinIndex(value)
         if i not in self.data[class_name]:
             self.data[class_name][i] = 0
 
         self.data[class_name][i] += 1
+        self.data["$summaries"][class_name][0] += 1
+        self.data["$summaries"][class_name][1] += value
+        self.data["$summaries"][class_name][2] += value**2
 
-    def getBinIndex(self, value: float) -> int:
+    def _getBinIndex(self, value: float) -> int:
         if value < self.bins.min or (self.bins.isClosed() and value > self.bins.max):
             warnings.warn(f"Value {value} is not within the histogram range [{self.bins.min};{self.bins.max}] so it was dropped.")
             return -1
@@ -552,6 +567,31 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
 
         value -= self.bins.min
         return int(value/self.bins.width)
+
+    def getSummaries(self, mode_as_middle: bool=False) -> Dict[str,Tuple[float,float,float]]:
+        """
+        Returns the exact mean, the approximate mode, and the exact standard deviation of the histogram of each class.
+        The exact estimators are taken from the BIRCH clustering algorithm.
+        The mode is obtained by finding the leftmost bin with the highest amount of samples.
+
+        :param mode_as_middle: Whether to give the mode as the middle of the highest bar, not the left boundary.
+        """
+        results = dict()
+        for class_name, (n,ls,ss) in self.data["$summaries"].items():
+            mean = ls/n
+            std  = sqrt(1/(n-1) * (ss - n*(ls/n)**2))
+
+            counts = self.data[class_name]
+            max_count = max(counts.values())
+            mode = None
+            for bin_idx, count in counts.items():
+                if count == max_count:
+                    mode = self.bins.min + self.bins.width*(bin_idx + 0.5*mode_as_middle)
+                    break
+
+            results[class_name] = (mean, mode, std)
+
+        return results
 
     def commit(self, global_args: ArgsGlobal, bin_reweighting: Dict[int,float]=None, **seaborn_args):
         """
@@ -570,7 +610,7 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
                     warnings.warn("Your histogram has no upper bound and no data to deduce it from. Nothing will be drawn.")
                     return
 
-                n_original_bins = max(max(d.keys()) for d in self.data.values()) + 1  # if n is the index of the last bin, you have bin 0, 1, 2, 3, ..., n-1, n, which is n+1 bins.
+                n_original_bins = max(max(bin_counts.keys()) for class_name,bin_counts in self.data.items() if class_name != "$summaries") + 1  # if n is the index of the last bin, you have bin 0, 1, 2, 3, ..., n-1, n, which is n+1 bins.
                 n_actual_bins = 1 + (n_original_bins-1) // global_args.combine_buckets
             else:  # For closed intervals, you cannot pretend there are more bins to the right to make groups of equal size.
                 # TODO: What you could do, however, is check that max(self.data["counts"]) is far enough from the end of the interval to pretend that the interval is actually a bit shorter.
@@ -584,6 +624,9 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
             data_in_compressed_bins = dict()
             nonzero_bins = set()
             for class_name, counts in self.data.items():
+                if class_name == "$summaries":
+                    continue
+
                 data_in_compressed_bins[class_name] = defaultdict(float)
                 for original_bin_index, count in counts.items():
                     new_bin_index = original_bin_index // global_args.combine_buckets
@@ -656,6 +699,10 @@ class VariableGranularityHistogram(_PrecomputedMultiHistogram):
             N = global_args.n_bins
             bin_to_height = defaultdict(float)
 
+            total_samples = 0
+            sum_of_fractions = 0
+            sum_of_squared_fractions = 0
+
             for n,xs in self.data["domains"].items():
                 for i in xs:
                     lower_bin = int(N * i/n)      # At most N-1
@@ -667,6 +714,10 @@ class VariableGranularityHistogram(_PrecomputedMultiHistogram):
                     n_bins = upper_bin - lower_bin
                     for b in range(n_bins):
                         bin_to_height[lower_bin+b] += 1/n_bins
+                        
+                    total_samples            += 1
+                    sum_of_fractions         += i/(n-1)
+                    sum_of_squared_fractions += (i/(n-1))**2
 
             # Convert the bins (up to N of them) to horizontal coordinates.
             visual_range = BinSpec.closedFromAmount(minimum=global_args.x_min, maximum=global_args.x_max, amount=N)
@@ -679,3 +730,28 @@ class VariableGranularityHistogram(_PrecomputedMultiHistogram):
 
             # Commit
             self._commitGivenBars(global_args, xs, {"": ys}, closed_bin_spec=visual_range, **seaborn_args)
+
+            # Store summary statistics
+            max_height = max(ys)
+            argmax_height = None
+            for i in range(len(ys)):
+                if ys[i] == max_height:
+                    argmax_height = xs[i]  # Leftmost boundary of that bar.
+                    break
+
+            self.cache = {
+                "mean": sum_of_fractions/total_samples,
+                "mode": argmax_height,
+                "std": sqrt(1/(total_samples-1) * (sum_of_squared_fractions - total_samples*(sum_of_squared_fractions/total_samples)**2))
+            }
+
+    def getSummary(self) -> Tuple[float,float,float]:
+        """
+        After a commit, returns mean of the variable-granularity fractions, mode of the histogram, and standard deviation
+        of those fractions.
+        
+        Note: the center of mass of the histogram is not the same as the mean of the data inside it.
+        For example, if you only sample from the domain with 4 possible values (equivalent to 0/3, 1/3, 2/3, 3/3), then
+        if you only ever added 0, the mean should be 0 whereas the histogram would suggest a mean of 1/8.
+        """
+        return self.cache["mean"], self.cache["mode"], self.cache["std"]
