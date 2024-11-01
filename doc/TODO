@@ -1,4 +1,7 @@
 TODO:
+    - There should be a global switch to the effect of "ignore the caches and set everything and recompute everything".
+      This would be for when you're debugging and you produced bad data on an IF_MISSING, and you don't want to go in to delete all those data.
+    - Animations, i.e. stringing together commits into a multi-page PDF or a GIF.
     - Histogram is a subclass of MultiHistogram, but has some methods that are "more sophisticated" that should be
       integrated into MultiHistogram.
     - The JSON and PDF names are checked for availability independently, so JSON _0 can correspond to PDF _2 etc.

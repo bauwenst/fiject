@@ -18,7 +18,6 @@ Example usage:
 """
 from transformers.trainer_callback import TrainingArguments, TrainerState, TrainerControl, TrainerCallback
 from fiject import LineGraph, CacheMode
-import logging as logger
 from typing import List, Dict
 
 
@@ -55,7 +54,7 @@ class FijectCallback(TrainerCallback):
         for result_name, result_name_formatted in self.metrics_tracked.items():
             key = "eval_" + result_name
             if key not in metrics:
-                logger.warning(f"Huh? You asked to track metric '{key}' but you're not computing it!")
+                # logger.warning(f"Huh? You asked to track metric '{key}' but you're not computing it!")  # Let warnings be handled by the trainer code, not Fiject.
                 continue
 
             self.graph.add(result_name_formatted, state.global_step, metrics.get(key))
