@@ -543,7 +543,7 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
 
         assert "$summaries" not in self.data or set(self.data["$summaries"]) == set(filter(lambda name: name != "$summaries", self.data.keys()))
 
-    def add(self, class_name: str, value: float):
+    def add(self, class_name: str, value: float, weight: float=1.0):
         if class_name not in self.data:
             self.data[class_name] = dict()
             self.data["$summaries"][class_name] = [0,0,0]
@@ -552,10 +552,10 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
         if i not in self.data[class_name]:
             self.data[class_name][i] = 0
 
-        self.data[class_name][i] += 1
-        self.data["$summaries"][class_name][0] += 1
-        self.data["$summaries"][class_name][1] += value
-        self.data["$summaries"][class_name][2] += value**2
+        self.data[class_name][i] += weight
+        self.data["$summaries"][class_name][0] += weight
+        self.data["$summaries"][class_name][1] += weight*value
+        self.data["$summaries"][class_name][2] += weight*value**2
 
     def _getBinIndex(self, value: float) -> int:
         if value < self.bins.min or (self.bins.isClosed() and value > self.bins.max):
@@ -579,7 +579,7 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
         results = dict()
         for class_name, (n,ls,ss) in self.data["$summaries"].items():
             mean = ls/n
-            std  = sqrt(1/(n-1) * (ss - n*(ls/n)**2))
+            std  = sqrt(1/(n-1) * (ss - n*(ls/n)**2))  if n > 1 else  0.0
 
             counts = self.data[class_name]
             max_count = max(counts.values())
@@ -644,6 +644,41 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
             self._commitGivenBars(global_args, bin_borders, serial_data, closed_bin_spec=new_bins, **seaborn_args)
 
 
+class StreamingVariableGranularityHistogram(StreamingMultiHistogram):
+
+    def add(self, i: int, n: int, class_name: str, weight: float=1.0):
+        """
+        Add a sample i from a domain {0, 1, 2, ..., n-1} and spread it across the corresponding 1/n'th of the bins of the histogram.
+        """
+        if class_name not in self.data:
+            self.data[class_name] = dict()
+            self.data["$summaries"][class_name] = [0,0,0]
+
+        # This whole part is different from StreamingMultiHistogram, which normally just finds one bin and does so by
+        # applying the (value - min)/(max - min) transform. Instead, we do not apply the transformation, and we spread
+        # the weight across a span of bins.
+        lower_bin = int(self.bins.amount *     i/n)  # At most N-1
+        upper_bin = int(self.bins.amount * (i+1)/n)  # At most N, in the one case of i == n-1.
+        if lower_bin == upper_bin:  # Happens when your data bins are smaller than your final bins.
+            upper_bin += 1
+
+        n_bins = upper_bin - lower_bin
+        for b in range(n_bins):
+            current_bin = lower_bin+b
+            if current_bin not in self.data[class_name]:
+                self.data[class_name][current_bin] = 0
+
+            self.data[class_name][current_bin] += weight/n_bins
+
+        # Update summaries, NOT about the '1/n_bins' we added to the different bins,
+        # but instead of the i/(n-1) value these bins are roughly centred around, which is what the histogram represents.
+        fraction_0_to_1 = i/(n-1)  if n > 1 else  1  # 0/0 becomes 1
+        point_value = self.bins.min + fraction_0_to_1*(self.bins.max - self.bins.min)
+        self.data["$summaries"][class_name][0] += weight
+        self.data["$summaries"][class_name][1] += weight*point_value
+        self.data["$summaries"][class_name][2] += weight*point_value**2
+
+
 class VariableGranularityHistogram(_PrecomputedMultiHistogram):
     """
     Histogram used for combining measurements made for multiple discrete domains that have the same range but a different
@@ -682,68 +717,41 @@ class VariableGranularityHistogram(_PrecomputedMultiHistogram):
         self.data["domains"] = dict()
 
     def _load(self, saved_data: dict):
-        for n,xs in saved_data["domain"].items():
+        for n,xs in saved_data["domains"].items():
             self.data[int(n)] = xs
 
-    def add(self, i: int, n: int):
+    def add(self, i: int, n: int, weight: float=1.0):
         """
         Add a sample i from a domain {0, 1, 2, ..., n-1}.
         """
         if n not in self.data["domains"]:
             self.data["domains"][n] = []
 
-        self.data["domains"][n].append(i)
+        self.data["domains"][n].append((i,weight))
 
     def commit(self, global_args: ArgsGlobal, **seaborn_args):
         with ProtectedData(self):
-            N = global_args.n_bins
-            bin_to_height = defaultdict(float)
+            CLASS_NAME = ""  # TODO: This class should become multi-class.
+            bins = BinSpec.closedFromAmount(minimum=global_args.x_min, maximum=global_args.x_max, amount=global_args.n_bins)
 
-            total_samples = 0
-            sum_of_fractions = 0
-            sum_of_squared_fractions = 0
-
+            # The data stored in this class will now, in one go, be parsed by a streaming implementation.
+            histo_builder = StreamingVariableGranularityHistogram(name=self.name, binspec=bins)
             for n,xs in self.data["domains"].items():
-                for i in xs:
-                    lower_bin = int(N * i/n)      # At most N-1
-                    upper_bin = int(N * (i+1)/n)  # At most N, in the one case of i == n-1.
+                for i,weight in xs:
+                    histo_builder.add(i, n, class_name=CLASS_NAME, weight=weight)
 
-                    if lower_bin == upper_bin:  # Happens when your data bins are smaller than your final bins.
-                        upper_bin += 1
-
-                    n_bins = upper_bin - lower_bin
-                    for b in range(n_bins):
-                        bin_to_height[lower_bin+b] += 1/n_bins
-                        
-                    total_samples            += 1
-                    sum_of_fractions         += i/(n-1)
-                    sum_of_squared_fractions += (i/(n-1))**2
-
-            # Convert the bins (up to N of them) to horizontal coordinates.
-            visual_range = BinSpec.closedFromAmount(minimum=global_args.x_min, maximum=global_args.x_max, amount=N)
-
+            # Convert the N bins in [0,1] to shifted and scaled horizontal coordinates.
             xs = []
             ys = []
-            for bin_index, count in bin_to_height.items():
-                xs.append(visual_range.min + visual_range.width*bin_index)
+            for bin_index, count in histo_builder.data[CLASS_NAME].items():
+                xs.append(bins.min + bins.width*bin_index)
                 ys.append(count)
 
             # Commit
-            self._commitGivenBars(global_args, xs, {"": ys}, closed_bin_spec=visual_range, **seaborn_args)
+            self._commitGivenBars(global_args, xs, {CLASS_NAME: ys}, closed_bin_spec=bins, **seaborn_args)
 
-            # Store summary statistics
-            max_height = max(ys)
-            argmax_height = None
-            for i in range(len(ys)):
-                if ys[i] == max_height:
-                    argmax_height = xs[i]  # Leftmost boundary of that bar.
-                    break
-
-            self.cache = {
-                "mean": sum_of_fractions/total_samples,
-                "mode": argmax_height,
-                "std": sqrt(1/(total_samples-1) * (sum_of_squared_fractions - total_samples*(sum_of_squared_fractions/total_samples)**2))
-            }
+            # Fill cache with summary statistics
+            self.cache = histo_builder.getSummaries()[""]
 
     def getSummary(self) -> Tuple[float,float,float]:
         """
@@ -754,4 +762,4 @@ class VariableGranularityHistogram(_PrecomputedMultiHistogram):
         For example, if you only sample from the domain with 4 possible values (equivalent to 0/3, 1/3, 2/3, 3/3), then
         if you only ever added 0, the mean should be 0 whereas the histogram would suggest a mean of 1/8.
         """
-        return self.cache["mean"], self.cache["mode"], self.cache["std"]
+        return self.cache
