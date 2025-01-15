@@ -56,7 +56,6 @@ def tst_granularity():
     histo.commit(StreamingVariableGranularityHistogram.ArgsGlobal())
 
 
-
 if __name__ == "__main__":
     # tst_streaming()
     tst_granularity()

@@ -475,9 +475,7 @@ class Table(Diagram):
             all_lines = first_line + "\n" + content_lines + "\n" + last_line
 
             if export_mode != ExportMode.RETURN_ONLY:
-                print(f"Writing .tex {self.name} ...")
-                with open(PathHandling.getSafePath(PathHandling.getProductionFolder(), self.name, ".tex"), "w") as file:
-                    file.write(all_lines)
+                Diagram.writeLines([all_lines], self.name, ".tex", overwrite_if_possible=self.overwrite)
             if export_mode != ExportMode.SAVE_ONLY:
                 return all_lines
 

@@ -158,7 +158,7 @@ class Diagram(ABC):
     ### STATIC METHODS (should only be used if the non-static methods don't suffice)
 
     @staticmethod
-    def writeFigure(stem: str, suffix: str, figure: plt.Figure, overwrite_if_possible: bool=False, show: bool=False):
+    def writeFigure(figure: plt.Figure, stem: str, suffix: str, overwrite_if_possible: bool=False, show: bool=False) -> Path:
         """
         Write a matplotlib figure to a file. For best results, use suffix=".pdf".
 
@@ -172,55 +172,64 @@ class Diagram(ABC):
             figure.savefig(try_this_path.as_posix(), bbox_inches='tight', dpi=FIJECT_DEFAULTS.DPI_IF_NOT_PDF)  # DPI is ignored for PDF output.
 
         print(f"Writing figure {stem} ...")
-        existing_path = PathHandling.getHighestAlias(PathHandling.getProductionFolder(), stem, suffix)
-        safe_path     = PathHandling.getSafePath(PathHandling.getProductionFolder(), stem, suffix)
-        if overwrite_if_possible and existing_path is not None:
-            try:
-                writeGivenFigure(existing_path)
-            except:  # Probably open in some kind of viewer.
-                writeGivenFigure(safe_path)
-        else:
-            writeGivenFigure(safe_path)
+        return Diagram.write(PathHandling.getProductionFolder(), stem, suffix, overwrite_if_possible, writeGivenFigure)
 
     @staticmethod
-    def writeData(stem: str, data: dict, overwrite_if_possible: bool=False):
+    def writeDictionary(data: dict, stem: str, overwrite_if_possible: bool=False) -> Path:
         """
         Write a json of data points to a file.
 
         :param overwrite_if_possible: See writeFigure().
         """
-        def writeGivenData(try_this_path: Path):
+        def writeGivenDict(try_this_path: Path):
             with open(try_this_path, "w", encoding="utf-8") as file:
                 json.dump(data, file)
 
-        print(f"Writing json {stem} ...")
-        existing_path = PathHandling.getHighestAlias(PathHandling.getRawFolder(), stem, ".json")
-        safe_path     = PathHandling.getSafePath(PathHandling.getRawFolder(), stem, ".json")
+        print(f"Writing dictionary {stem} ...")
+        return Diagram.write(PathHandling.getRawFolder(), stem, ".json", overwrite_if_possible, writeGivenDict)
+
+    @staticmethod
+    def writeLines(lines: Iterable[str], stem: str, suffix: str=".txt", overwrite_if_possible: bool=False) -> Path:
+        def writeGivenLines(try_this_path: Path):
+            with open(try_this_path, "w", encoding="utf-8") as file:
+                file.writelines(map(lambda line: line + "\n"*(not line.endswith("\n")), lines))
+
+        print(f"Writing lines {stem} ...")
+        return Diagram.write(PathHandling.getProductionFolder(), stem, suffix, overwrite_if_possible, writeGivenLines)
+
+    @staticmethod
+    def write(folder: Path, stem: str, suffix: str,
+              overwrite_if_possible: bool, save_function: Callable[[Path],None]) -> Path:
+        existing_path = PathHandling.getHighestAlias(folder, stem, suffix)
+        safe_path     = PathHandling.getSafePath(folder, stem, suffix)
         if overwrite_if_possible and existing_path is not None:
             try:
-                writeGivenData(existing_path)
-            except:  # Should not really happen because JSON editors usually don't lock files.
-                writeGivenData(safe_path)
+                save_function(existing_path)
+                return existing_path
+            except:  # Probably open in some kind of viewer.
+                save_function(safe_path)
+                return safe_path
         else:
-            writeGivenData(safe_path)
+            save_function(safe_path)
+            return safe_path
 
     ### IMPLEMENTATIONS
 
     def exportToPdf(self, fig, export_mode: ExportMode=ExportMode.SAVE_ONLY, stem_suffix: str=""):
         if export_mode != ExportMode.RETURN_ONLY:  # if export_mode != don't save
-            Diagram.writeFigure(stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, figure=fig, overwrite_if_possible=self.overwrite)
+            Diagram.writeFigure(figure=fig, stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, overwrite_if_possible=self.overwrite)
         if export_mode == ExportMode.SAVE_ONLY:  # if export_mode == don't return
             plt.close(fig)
 
     def save(self, metadata: dict=None):
-        Diagram.writeData(stem=self.name, data={
+        Diagram.writeDictionary(data={
             "time": {
                 "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "start-to-finish-secs": round(time.perf_counter() - self.creation_time, 2),
             },
             "metadata": metadata or dict(),
             "data": self._save()  # TODO: This is very, very inefficient. You should store data not as ASCII but as a binary file or in some other compressed format.
-        }, overwrite_if_possible=self.overwrite)
+        }, stem=self.name, overwrite_if_possible=self.overwrite)
 
     def load(self, json_path: Path) -> dict:
         """

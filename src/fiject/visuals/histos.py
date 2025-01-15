@@ -130,7 +130,7 @@ class MultiHistogram(Diagram):
             df = self.toDataframe()
             if len(self.data) != 1:
                 legend_title = FIJECT_DEFAULTS.LEGEND_TITLE_CLASS
-                # print(df.groupby(DEFAULTS.LEGEND_TITLE_CLASS).describe())
+                print(df.groupby(FIJECT_DEFAULTS.LEGEND_TITLE_CLASS).describe())
             else:
                 legend_title = None
                 print(df.value_counts())
@@ -645,6 +645,12 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
 
 
 class StreamingVariableGranularityHistogram(StreamingMultiHistogram):
+
+    def __init__(self, name: str, binspec: BinSpec,
+                 caching: CacheMode=CacheMode.NONE, overwriting: bool=False):
+        if not binspec.isClosed():
+            raise ValueError("Cannot instantiate a StreamingVariableGranularityHistogram without a closed bin domain!")
+        super().__init__(name=name, binspec=binspec, caching=caching, overwriting=overwriting)
 
     def add(self, i: int, n: int, class_name: str, weight: float=1.0):
         """
