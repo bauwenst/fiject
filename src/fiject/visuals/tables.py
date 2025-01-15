@@ -137,7 +137,7 @@ class RowGroupInColumn:
     value_of_first: int  # its value (cached so that you're not re-applying the cell function for every delta)
 
 
-class Table(Diagram):
+class Table(Visual):
     """
     Structure with named rows and infinitely many nested named columns, AND with an order for all columns and all rows.
     A good example of this kind of table is the morphemic-lexemic unweighted-weighted Pr-Re-F1 tables in my thesis.
@@ -475,7 +475,7 @@ class Table(Diagram):
             all_lines = first_line + "\n" + content_lines + "\n" + last_line
 
             if export_mode != ExportMode.RETURN_ONLY:
-                Diagram.writeLines([all_lines], self.name, ".tex", overwrite_if_possible=self.overwrite)
+                Visual.writeLines([all_lines], self.name, ".tex", overwrite_if_possible=self.overwrite)
             if export_mode != ExportMode.SAVE_ONLY:
                 return all_lines
 

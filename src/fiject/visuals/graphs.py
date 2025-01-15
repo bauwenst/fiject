@@ -10,7 +10,7 @@ from ..general import *
 from ..util.functions import weightedMean, weightedVariance
 
 
-class LineGraph(Diagram):
+class LineGraph(Visual):
     """
     2D line graph. Plots the relationship between TWO variables, given in paired observations (x,y), and connects them.
     For the name, see: https://trends.google.com/trends/explore?date=all&q=line%20graph,line%20chart,line%20plot
@@ -93,7 +93,7 @@ class LineGraph(Diagram):
                y_lims=None, x_tickspacing=None, y_tickspacing=None, logx=False, logy=False,
                export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
         self.commitWithArgs(
-            diagram_options=LineGraph.ArgsGlobal(
+            global_options=LineGraph.ArgsGlobal(
                 aspect_ratio=aspect_ratio,
                 x_label=x_label,
                 y_label=y_label,
@@ -116,7 +116,7 @@ class LineGraph(Diagram):
             existing_figax=existing_figax
         )
 
-    def commitWithArgs(self, diagram_options: ArgsGlobal, default_line_options: ArgsPerLine, extra_line_options: Dict[str,ArgsPerLine]=None,
+    def commitWithArgs(self, global_options: ArgsGlobal, default_line_options: ArgsPerLine, extra_line_options: Dict[str,ArgsPerLine]=None,
                        export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
         """
         Render a figure based on the added data.
@@ -126,14 +126,15 @@ class LineGraph(Diagram):
         instead of LaTeX commands), the entire implementation is wrapped in a try-except.
         Yes, I had to find out the hard way by losing a 6-hour render.
         """
+        do = global_options
         with ProtectedData(self):
             if extra_line_options is None:
                 extra_line_options = dict()
-            if not diagram_options.functions:
-                diagram_options.functions = dict()
+            if not do.functions:
+                do.functions = dict()
 
             if existing_figax is None:
-                fig, main_ax = LineGraph._newFigAx(diagram_options)
+                fig, main_ax = LineGraph._newFigAx(do)
             else:
                 fig, main_ax = existing_figax
 
@@ -146,19 +147,19 @@ class LineGraph(Diagram):
                 max_x = +1
 
             all_series = [(name, xy) for name, xy in self.data.items()]
-            if not diagram_options.logx:
-                xs = np.linspace(min_x, max_x, num=diagram_options.function_samples)
+            if not do.logx:
+                xs = np.linspace(min_x, max_x, num=do.function_samples)
             else:
-                xs = np.logspace(np.log10(min_x), np.log10(max_x), num=diagram_options.function_samples)
-            for name, f in diagram_options.functions.items():
+                xs = np.logspace(np.log10(min_x), np.log10(max_x), num=do.function_samples)
+            for name, f in do.functions.items():
                 ys = [f(x) for x in xs]
                 all_series.append((name, (xs,ys)))
 
             # Plotting
-            styles = LineGraph._makeLineStyleGenerator(advance_by=diagram_options.initial_style_idx)
+            styles = LineGraph._makeLineStyleGenerator(advance_by=do.initial_style_idx)
             for name, (xs,ys) in all_series:
                 # Get style options
-                is_function = name in diagram_options.functions
+                is_function = name in do.functions
                 marker, line, colour = LineGraph._resolveLineStyle(name, is_function, default_line_options, extra_line_options, styles)
 
                 # Draw lines
@@ -167,65 +168,65 @@ class LineGraph(Diagram):
                     continue
 
                 xs, ys = zip(*sorted(zip(xs,ys)))
-                if diagram_options.logx and diagram_options.logy:
-                    main_ax.loglog(  xs, ys, style, c=colour, label=name, linewidth=diagram_options.curve_linewidth)
-                elif diagram_options.logx:
-                    main_ax.semilogx(xs, ys, style, c=colour, label=name, linewidth=diagram_options.curve_linewidth)
-                elif diagram_options.logy:
-                    main_ax.semilogy(xs, ys, style, c=colour, label=name, linewidth=diagram_options.curve_linewidth)
+                if do.logx and do.logy:
+                    main_ax.loglog(  xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
+                elif do.logx:
+                    main_ax.semilogx(xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
+                elif do.logy:
+                    main_ax.semilogy(xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
                 else:
-                    main_ax.plot(    xs, ys, style, c=colour, label=name, linewidth=diagram_options.curve_linewidth)
+                    main_ax.plot(    xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
 
-            if diagram_options.optional_line_at_y is not None:
-                main_ax.hlines(diagram_options.optional_line_at_y, min_x, max_x,
+            if do.optional_line_at_y is not None:
+                main_ax.hlines(do.optional_line_at_y, min_x, max_x,
                                colors='b', linestyles='dotted')
 
-            if diagram_options.x_label:
-                main_ax.set_xlabel(diagram_options.x_label)
-            if diagram_options.y_label:
-                main_ax.set_ylabel(diagram_options.y_label)
-            if diagram_options.legend_position:  # Can be None or "" to turn it off.
-                main_ax.legend(loc=diagram_options.legend_position)
+            if do.x_label:
+                main_ax.set_xlabel(do.x_label)
+            if do.y_label:
+                main_ax.set_ylabel(do.y_label)
+            if do.legend_position:  # Can be None or "" to turn it off.
+                main_ax.legend(loc=do.legend_position)
 
-            if diagram_options.y_lims:
-                main_ax.set_ylim(diagram_options.y_lims[0], diagram_options.y_lims[1])
+            if do.y_lims:
+                main_ax.set_ylim(do.y_lims[0], do.y_lims[1])
 
             # FIXME: Known issue: you can't make 5 x 10^1 show as a tick label.
             #        I even found a SO post where the plot has exactly that issue: https://stackoverflow.com/q/49750107/9352077
-            if diagram_options.logx:
-                if not diagram_options.logx_becomes_linear_at:
+            if do.logx:
+                if not do.logx_becomes_linear_at:
                     main_ax.set_xscale("log")
-                    main_ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1, 10)) if diagram_options.tick_log_multiples else [1]))
-                    main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
+                    main_ax.xaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1, 10)) if do.tick_log_multiples else [1]))
+                    main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if do.tick_scientific_notation else tkr.ScalarFormatter())
                 else:
-                    main_ax.set_xscale("symlog", linthresh=diagram_options.logx_becomes_linear_at, linscale=0.5)
-            elif diagram_options.x_ticks_hardcoded:
-                main_ax.xaxis.set_ticks(diagram_options.x_ticks_hardcoded, minor=False)
-            elif diagram_options.x_tickspacing:
-                main_ax.xaxis.set_major_locator(tkr.MultipleLocator(diagram_options.x_tickspacing))
-                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
+                    main_ax.set_xscale("symlog", linthresh=do.logx_becomes_linear_at, linscale=0.5)
+            elif do.x_ticks_hardcoded:
+                main_ax.xaxis.set_ticks(do.x_ticks_hardcoded, minor=False)
+            elif do.x_tickspacing:
+                main_ax.xaxis.set_major_locator(tkr.MultipleLocator(do.x_tickspacing))
+                main_ax.xaxis.set_major_formatter(tkr.LogFormatterSciNotation() if do.tick_scientific_notation else tkr.ScalarFormatter())
 
-            if diagram_options.logy:
+            if do.logy:
                 main_ax.set_yscale("log")
-                main_ax.yaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1,10)) if diagram_options.tick_log_multiples else [1]))
-                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
+                main_ax.yaxis.set_major_locator(tkr.LogLocator(base=10, numticks=999, subs=list(range(1,10)) if do.tick_log_multiples else [1]))
+                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if do.tick_scientific_notation else tkr.ScalarFormatter())
                 # main_ax.yaxis.set_minor_locator(tkr.LogLocator(base=10, subs="all"))
                 # main_ax.yaxis.set_minor_formatter(tkr.LogFormatterSciNotation())
-            elif diagram_options.y_tickspacing:
-                main_ax.yaxis.set_major_locator(tkr.MultipleLocator(diagram_options.y_tickspacing))
-                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if diagram_options.tick_scientific_notation else tkr.ScalarFormatter())
+            elif do.y_tickspacing:
+                main_ax.yaxis.set_major_locator(tkr.MultipleLocator(do.y_tickspacing))
+                main_ax.yaxis.set_major_formatter(tkr.LogFormatterSciNotation() if do.tick_scientific_notation else tkr.ScalarFormatter())
 
-            if diagram_options.y_lims:  # Yes, twice. Don't ask.
-                main_ax.set_ylim(diagram_options.y_lims[0], diagram_options.y_lims[1])
+            if do.y_lims:  # Yes, twice. Don't ask.
+                main_ax.set_ylim(do.y_lims[0], do.y_lims[1])
 
-            if diagram_options.x_gridspacing or diagram_options.y_gridspacing:
-                if diagram_options.x_gridspacing:
-                    main_ax.xaxis.set_minor_locator(tkr.MultipleLocator(diagram_options.x_gridspacing))
-                if diagram_options.y_gridspacing:
-                    main_ax.yaxis.set_minor_locator(tkr.MultipleLocator(diagram_options.x_gridspacing))
-                main_ax.grid(True, which='both', linewidth=diagram_options.grid_linewidth)
+            if do.x_gridspacing or do.y_gridspacing:
+                if do.x_gridspacing:
+                    main_ax.xaxis.set_minor_locator(tkr.MultipleLocator(do.x_gridspacing))
+                if do.y_gridspacing:
+                    main_ax.yaxis.set_minor_locator(tkr.MultipleLocator(do.x_gridspacing))
+                main_ax.grid(True, which='both', linewidth=do.grid_linewidth)
 
-            if not diagram_options.do_spines:
+            if not do.do_spines:
                 main_ax.spines['top'].set_visible(False)
                 main_ax.spines['right'].set_visible(False)
 
@@ -263,7 +264,7 @@ class LineGraph(Diagram):
         ax2.add_artist(legend_1)
 
         # At last, save.
-        Diagram.writeFigure(fig, name, "." + FIJECT_DEFAULTS.RENDERING_FORMAT, overwrite_if_possible=self.overwrite)
+        Visual.writeFigure(fig, name, "." + FIJECT_DEFAULTS.RENDERING_FORMAT, overwrite_if_possible=self.overwrite)
 
     @staticmethod
     def qndLoadAndCommit(json_path: Path):
@@ -282,9 +283,9 @@ class LineGraph(Diagram):
     ##########################
 
     @staticmethod
-    def _newFigAx(diagram_options: ArgsGlobal):
-        fig, main_ax = newFigAx(diagram_options.aspect_ratio)
-        main_ax.grid(True, which='major', linewidth=diagram_options.grid_linewidth if diagram_options.grid_linewidth is not None else FIJECT_DEFAULTS.GRIDWIDTH)
+    def _newFigAx(global_options: ArgsGlobal):
+        fig, main_ax = newFigAx(global_options.aspect_ratio)
+        main_ax.grid(True, which='major', linewidth=global_options.grid_linewidth if global_options.grid_linewidth is not None else FIJECT_DEFAULTS.GRIDWIDTH)
         main_ax.axhline(y=0, color='k', lw=0.5)
         return fig, main_ax
 
@@ -320,7 +321,7 @@ class LineGraph(Diagram):
         return marker, line, colour
 
 
-class MergedLineGraph(Diagram):
+class MergedLineGraph(Visual):
     """
     Merger of two line graphs.
     The x axis is shared, the first graph's y axis is on the left, and the second graph's y axis is on the right.
@@ -391,7 +392,7 @@ class MergedLineGraph(Diagram):
             self.exportToPdf(fig)
 
 
-class StochasticLineGraph(Diagram):
+class StochasticLineGraph(Visual):
     """
     Same as a line graph except each line is now a collection of sequences whose average is plotted.
     Allows plotting uncertainty intervals.
@@ -432,20 +433,20 @@ class StochasticLineGraph(Diagram):
         self.data[series_name][index_of_x][1].append(y)
         self.data[series_name][index_of_x][2].append(weight)
 
-    def commit(self, diagram_options: ArgsGlobal, default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine]=None,
+    def commit(self, global_options: ArgsGlobal, default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine]=None,
                export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
         with ProtectedData(self):
             if extra_line_options is None:
                 extra_line_options = dict()
 
             if existing_figax is None:
-                fig, main_ax = LineGraph._newFigAx(diagram_options)
+                fig, main_ax = LineGraph._newFigAx(global_options)
             else:
                 fig, main_ax = existing_figax
 
             overlay_graph = LineGraph("-", caching=CacheMode.NONE)
             new_line_options = dict()
-            styles = LineGraph._makeLineStyleGenerator(advance_by=diagram_options.initial_style_idx)
+            styles = LineGraph._makeLineStyleGenerator(advance_by=global_options.initial_style_idx)
             for name, samples in self.data.items():
                 # Get style options
                 marker, line, colour = LineGraph._resolveLineStyle(name, False, default_line_options, extra_line_options, styles)
@@ -463,8 +464,8 @@ class StochasticLineGraph(Diagram):
                     n = len(ys)
                     Ybar_n = weightedMean(ys, ws)
                     S_n    = sqrt(weightedVariance(ys, ws, ddof=1))  # S_n² is an unbiased estimator of the variance.
-                    if diagram_options.twosided_ci_percentage:
-                        remainder_percentage = 100 - diagram_options.twosided_ci_percentage  # E.g. 5% for 95% CI
+                    if global_options.twosided_ci_percentage:
+                        remainder_percentage = 100 - global_options.twosided_ci_percentage  # E.g. 5% for 95% CI
                         one_side_remainder   = remainder_percentage/2                        # => Each side outside the CI captures 2.5%
                         alpha = (100-one_side_remainder)/100                                 # => Alpha is 0.975.
                         distribution: scipy.stats.rv_continuous = scipy.stats.t(n-1)
@@ -482,7 +483,7 @@ class StochasticLineGraph(Diagram):
                 # Plotting
                 if options.show_line:
                     main_ax.fill_between(sorted_input, average_line + upper_deviation_line, average_line - upper_deviation_line,
-                                         color=colour, alpha=diagram_options.uncertainty_opacity)
+                                         color=colour, alpha=global_options.uncertainty_opacity)
                 if options.show_points:
                     main_ax.errorbar(sorted_input, average_line, yerr=upper_deviation_line, color=colour, fmt='none',
                                      elinewidth=0.5, capthick=0.5, capsize=0.75, alpha=1.0)
@@ -492,7 +493,7 @@ class StochasticLineGraph(Diagram):
                 if name not in new_line_options:
                     new_line_options[name] = options
 
-            fig, main_ax = overlay_graph.commitWithArgs(diagram_options, default_line_options, new_line_options,
+            fig, main_ax = overlay_graph.commitWithArgs(global_options, default_line_options, new_line_options,
                                                         export_mode=ExportMode.RETURN_ONLY, existing_figax=(fig, main_ax))
 
             self.exportToPdf(fig, export_mode)

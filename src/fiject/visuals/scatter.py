@@ -8,7 +8,7 @@ import matplotlib.ticker as tkr
 
 
 
-class ScatterPlot(Diagram):
+class ScatterPlot(Visual):
 
     def _load(self, saved_data: dict):
         self.data = saved_data  # FIXME: Needs more sanity checks obviously
@@ -21,7 +21,7 @@ class ScatterPlot(Diagram):
 
     def addPointsToFamily(self, family_name: str, xs: Iterable[float], ys: Iterable[float]):
         """
-        Unlike the other diagram types, it seems justified to add scatterplot points in bulk.
+        Unlike the other `Visual`s, it seems justified to add scatterplot points in bulk.
         Neither axis is likely to represent time, so you'll probably have many points available at once.
         """
         if family_name not in self.data:
@@ -59,9 +59,9 @@ class ScatterPlot(Diagram):
         marker: str = None
         size: float = 35
 
-    def commitWithArgs(self, diagram_options: ArgsGlobal, default_family_options: ArgsPerFamily, extra_family_options: Dict[str,ArgsPerFamily]=None,
+    def commitWithArgs(self, global_options: ArgsGlobal, default_family_options: ArgsPerFamily, extra_family_options: Dict[str,ArgsPerFamily]=None,
                        export_mode: ExportMode=ExportMode.SAVE_ONLY):
-        do = diagram_options
+        do = global_options
         with ProtectedData(self):
             if extra_family_options is None:
                 extra_family_options = dict()

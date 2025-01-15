@@ -4,7 +4,7 @@ import matplotlib.ticker as tkr
 from ..general import *
 
 
-class Bars(Diagram):
+class Bars(Visual):
     """
     Multi-bar chart. Produces a chart with groups of bars on them: each group has the same amount of bars and the
     colours of the bars are in the same order per group.
@@ -90,7 +90,7 @@ class Bars(Diagram):
         )
 
 
-class HistoBars(Diagram):
+class HistoBars(Visual):
     """
     Bars with a numerical domain. Has two common usages:
         - List plot: you have a list of values and want to plot them as bar heights, possibly in ascending/descending

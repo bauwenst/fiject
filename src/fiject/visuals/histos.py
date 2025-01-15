@@ -18,7 +18,7 @@ import matplotlib.ticker as tkr
 from ..util.iterables import cat
 
 
-class MultiHistogram(Diagram):
+class MultiHistogram(Visual):
     """
     A histogram plots the distribution of a SINGLE variable.
     On the horizontal axis is that variable's domain. On the vertical axis is the frequency/fraction/... of each value.
@@ -113,8 +113,8 @@ class MultiHistogram(Diagram):
             center_ticks=center_ticks
         ), **seaborn_args)
 
-    def commitWithArgs_histplot(self, diagram_options: ArgsGlobal, **seaborn_args):
-        do = diagram_options
+    def commitWithArgs_histplot(self, global_options: ArgsGlobal, **seaborn_args):
+        do = global_options
         with ProtectedData(self):
             if do.relative_counts:
                 if do.average_over_bin:
@@ -228,8 +228,8 @@ class MultiHistogram(Diagram):
             class_axis_label=class_axis_label
         ))
 
-    def commitWithArgs_boxplot(self, diagram_options: ArgsGlobal_BoxPlot):
-        do = diagram_options
+    def commitWithArgs_boxplot(self, global_options: ArgsGlobal_BoxPlot):
+        do = global_options
         with ProtectedData(self):
             rows = []
             for name, x_values in self.data.items():
@@ -406,7 +406,7 @@ class BinOverlapMode(Enum):
             raise RuntimeError()
 
 
-class _PrecomputedMultiHistogram(Diagram):
+class _PrecomputedMultiHistogram(Visual):
 
     @dataclass
     class ArgsGlobal:

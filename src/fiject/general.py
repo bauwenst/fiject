@@ -64,7 +64,7 @@ class PathHandling:
 
 class CacheMode(Enum):
     """
-    Diagram data is stored in JSON files if desired by the user, and read back if desired by the user.
+    Data are stored in JSON files if desired by the user, and read back if desired by the user.
     The user likely wants one of the behaviours grouped below.
 
     | Exists | Read | Write | What does this mean?                                                  |
@@ -95,7 +95,7 @@ class CacheMode(Enum):
 class ExportMode(Enum):
     """
     Matplotlib keeps figures in memory unless they are destroyed explicitly. We allow users to get Matplotlib objects
-    when they commit a diagram, but then the user has to destroy them themselves. When they don't need the objects and
+    when they commit a `Visual`, but then the user has to destroy them themselves. When they don't need the objects and
     just want the export, we destroy the figure for them.
     """
     SAVE_ONLY = 1
@@ -103,11 +103,11 @@ class ExportMode(Enum):
     SAVE_AND_RETURN = 3
 
 
-class Diagram(ABC):
+class Visual(ABC):
 
     def __init__(self, name: str, caching: CacheMode=CacheMode.NONE, overwriting: bool=False):
         """
-        Constructs a Diagram object with a name (for file I/O) and space to store data.
+        Constructs a `Visual` object with a name (for file I/O) and space to store data.
         The reason why the subclasses don't have initialisers is two-fold:
             1. They all looked like
                 def __init__(self, name: str, use_cached: bool):
@@ -146,10 +146,10 @@ class Diagram(ABC):
                 try:
                     metadata = self.load(cache_path)
                     seconds = int(metadata['time']['start-to-finish-secs'])
-                    print(f"Successfully preloaded data for diagram '{self.name}' sparing you {seconds//60}m{seconds%60}s of computation time.")
+                    print(f"Successfully preloaded data for visual '{self.name}' sparing you {seconds//60}m{seconds%60}s of computation time.")
                     already_exists = True
                 except Exception as e:
-                    print(f"Could not load cached diagram '{self.name}':", e)
+                    print(f"Could not load cached visual '{self.name}':", e)
 
             if not already_exists:  # Cache miss
                 self.needs_computation = True
@@ -172,7 +172,7 @@ class Diagram(ABC):
             figure.savefig(try_this_path.as_posix(), bbox_inches='tight', dpi=FIJECT_DEFAULTS.DPI_IF_NOT_PDF)  # DPI is ignored for PDF output.
 
         print(f"Writing figure {stem} ...")
-        return Diagram.write(PathHandling.getProductionFolder(), stem, suffix, overwrite_if_possible, writeGivenFigure)
+        return Visual.write(PathHandling.getProductionFolder(), stem, suffix, overwrite_if_possible, writeGivenFigure)
 
     @staticmethod
     def writeDictionary(data: dict, stem: str, overwrite_if_possible: bool=False) -> Path:
@@ -186,7 +186,7 @@ class Diagram(ABC):
                 json.dump(data, file)
 
         print(f"Writing dictionary {stem} ...")
-        return Diagram.write(PathHandling.getRawFolder(), stem, ".json", overwrite_if_possible, writeGivenDict)
+        return Visual.write(PathHandling.getRawFolder(), stem, ".json", overwrite_if_possible, writeGivenDict)
 
     @staticmethod
     def writeLines(lines: Iterable[str], stem: str, suffix: str=".txt", overwrite_if_possible: bool=False) -> Path:
@@ -195,7 +195,7 @@ class Diagram(ABC):
                 file.writelines(map(lambda line: line + "\n"*(not line.endswith("\n")), lines))
 
         print(f"Writing lines {stem} ...")
-        return Diagram.write(PathHandling.getProductionFolder(), stem, suffix, overwrite_if_possible, writeGivenLines)
+        return Visual.write(PathHandling.getProductionFolder(), stem, suffix, overwrite_if_possible, writeGivenLines)
 
     @staticmethod
     def write(folder: Path, stem: str, suffix: str,
@@ -217,12 +217,12 @@ class Diagram(ABC):
 
     def exportToPdf(self, fig, export_mode: ExportMode=ExportMode.SAVE_ONLY, stem_suffix: str=""):
         if export_mode != ExportMode.RETURN_ONLY:  # if export_mode != don't save
-            Diagram.writeFigure(figure=fig, stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, overwrite_if_possible=self.overwrite)
+            Visual.writeFigure(figure=fig, stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, overwrite_if_possible=self.overwrite)
         if export_mode == ExportMode.SAVE_ONLY:  # if export_mode == don't return
             plt.close(fig)
 
     def save(self, metadata: dict=None):
-        Diagram.writeDictionary(data={
+        Visual.writeDictionary(data={
             "time": {
                 "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "start-to-finish-secs": round(time.perf_counter() - self.creation_time, 2),
@@ -258,7 +258,7 @@ class Diagram(ABC):
         self.cache = dict()
 
     def isEmpty(self) -> bool:
-        return Diagram._isEmpty(self.data)
+        return Visual._isEmpty(self.data)
 
     @staticmethod
     def _isEmpty(iterable: Iterable) -> bool:
@@ -268,7 +268,7 @@ class Diagram(ABC):
         for value in (iterable.values() if isinstance(iterable, dict) else iterable):
             if not isinstance(value, Iterable):  # Found a value by iterating that is not an iterable itself. That's non-emptiness!
                 return False
-            elif not Diagram._isEmpty(value):  # Found a value that is an iterable and it isn't empty itself.
+            elif not Visual._isEmpty(value):  # Found a value that is an iterable and it isn't empty itself.
                 return False
 
         return True  # All values were empty iterables.
@@ -306,7 +306,7 @@ class ProtectedData:
            class can't anticipate the method name.
     """
 
-    def __init__(self, protected_figure: Diagram, metadata: dict=None):
+    def __init__(self, protected_figure: Visual, metadata: dict=None):
         self.protected_figure = protected_figure
         self.metadata = metadata or dict()
 
