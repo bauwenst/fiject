@@ -9,10 +9,17 @@ def weightedMean(samples: np.ndarray, weights: np.ndarray=None):
     if not isinstance(weights, np.ndarray):
         weights = np.array(weights)
 
-    return 1/np.sum(weights) * np.sum(weights * samples)
+    return float(1/np.sum(weights) * np.sum(weights * samples))
 
 
-def weightedVariance(samples: np.ndarray, weights: np.ndarray=None, ddof: int=1):  # S² with ddof=1
+def weightedVariance(samples: np.ndarray, weights: np.ndarray=None, ddof: int=1):
+    """
+    Unbiased sample variance S².
+
+    Note that if the weights are not integers, the Bessel correction 1/(sum(w)-1) is no longer the correct factor that causes
+    the estimator to be unbiased. Some say you should use 1/(sum(w)*(n-1)/n) as the correction factor, but this does NOT
+    seem to be founded in the requirement that E[S^2] = E[(X - E[X])^2]. https://stats.stackexchange.com/q/6534/360389
+    """
     if weights is None:
         weights = np.ones_like(samples)
     if not isinstance(samples, np.ndarray):
@@ -21,5 +28,5 @@ def weightedVariance(samples: np.ndarray, weights: np.ndarray=None, ddof: int=1)
         weights = np.array(weights)
 
     mu = weightedMean(samples, weights)
-    n  = len(samples)
-    return 1/(n - ddof)*np.sum(weights * (n/np.sum(weights)) * (samples - mu)**2)  # You can't subtract the ddof from sum(weights), so you need to ensure that the weights have been renormalised so as to sum to n.
+    n  = np.sum(weights)
+    return float(1/(n - ddof)*np.sum(weights * (samples - mu)**2))

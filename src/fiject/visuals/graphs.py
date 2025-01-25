@@ -1,8 +1,9 @@
+import warnings
 from dataclasses import dataclass
-
 from math import sqrt
 import scipy
 import itertools
+from collections import defaultdict
 
 import matplotlib.ticker as tkr
 
@@ -392,16 +393,85 @@ class MergedLineGraph(Visual):
             self.exportToPdf(fig)
 
 
-class StochasticLineGraph(Visual):
-    """
-    Same as a line graph except each line is now a collection of sequences whose average is plotted.
-    Allows plotting uncertainty intervals.
-    """
+class _PrecomputedStochasticLineGraph(Visual):
 
     @dataclass
     class ArgsGlobal(LineGraph.ArgsGlobal):
         uncertainty_opacity: float = 0.0
         twosided_ci_percentage: float = None
+
+    def _commit(self, global_options: ArgsGlobal, default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine],
+                series_to_x_to_n_w_mu_sigma: Dict[str,Dict[float,Tuple[int,float,float,float]]],
+                export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
+        if extra_line_options is None:
+            extra_line_options = dict()
+
+        if existing_figax is None:
+            fig, main_ax = LineGraph._newFigAx(global_options)
+        else:
+            fig, main_ax = existing_figax
+
+        overlay_graph = LineGraph("-", caching=CacheMode.NONE)
+        new_line_options = dict()
+        styles = LineGraph._makeLineStyleGenerator(advance_by=global_options.initial_style_idx)
+        for name, samples in series_to_x_to_n_w_mu_sigma.items():
+            # Get style options
+            marker, line, colour = LineGraph._resolveLineStyle(name, False, default_line_options, extra_line_options, styles)
+            options = extra_line_options.get(name, default_line_options)
+            new_line_options[name] = LineGraph.ArgsPerLine(
+                show_line=options.show_line, show_points=options.show_points,
+                point_marker=marker, line_style=line, colour=colour
+            )
+
+            # Turn samples into a plottable line.
+            sorted_input = []
+            average_line = []
+            upper_deviation_line = []
+            for x, (_, w, mu, sigma) in sorted(samples.items()):
+                if global_options.twosided_ci_percentage:
+                    remainder_percentage = 100 - global_options.twosided_ci_percentage  # E.g. 5% for 95% CI
+                    one_side_remainder = remainder_percentage / 2  # => Each side outside the CI captures 2.5%
+                    alpha = (100 - one_side_remainder) / 100  # => Alpha is 0.975.
+                    distribution: scipy.stats.rv_continuous = scipy.stats.t(w-1)
+                    quantile = distribution.ppf(alpha)
+                    deviation = quantile * sigma/sqrt(w)
+                else:
+                    deviation = sigma
+
+                sorted_input.append(x)
+                average_line.append(mu)
+                upper_deviation_line.append(deviation)
+
+            sorted_input, average_line, upper_deviation_line = np.array(sorted_input), np.array(average_line), np.array(upper_deviation_line)
+
+            # Plotting
+            if options.show_line:
+                main_ax.fill_between(sorted_input, average_line + upper_deviation_line,
+                                     average_line - upper_deviation_line,
+                                     color=colour, alpha=global_options.uncertainty_opacity)
+            if options.show_points:
+                main_ax.errorbar(sorted_input, average_line, yerr=upper_deviation_line, color=colour, fmt='none',
+                                 elinewidth=0.5, capthick=0.5, capsize=0.75, alpha=1.0)
+            overlay_graph.addMany(name, sorted_input, average_line)
+
+        # Above, the extra_line_options were already consulted to construct the new_line_options. This loop is for lines that weren't drawn yet (e.g. functions).
+        for name, options in extra_line_options.items():
+            if name not in new_line_options:
+                new_line_options[name] = options
+
+        fig, main_ax = overlay_graph.commitWithArgs(global_options, default_line_options, new_line_options,
+                                                    export_mode=ExportMode.RETURN_ONLY, existing_figax=(fig, main_ax))
+
+        self.exportToPdf(fig, export_mode)
+        if export_mode != ExportMode.SAVE_ONLY:
+            return fig, main_ax
+
+
+class StochasticLineGraph(_PrecomputedStochasticLineGraph):
+    """
+    Same as a line graph except each line is now a collection of sequences whose average is plotted.
+    Allows plotting uncertainty intervals.
+    """
 
     def _load(self, saved_data: dict):
         for series_name, samples in saved_data.items():
@@ -418,8 +488,10 @@ class StochasticLineGraph(Visual):
 
     def addSample(self, series_name: str, x: float, y: float, weight: float=1.0):
         if type(x) == str or type(y) == str:
-            print("WARNING: You are trying to use a string as x or y data. The datapoint was discarded, because this causes nonsensical graphs.")
+            warnings.warn("WARNING: You are trying to use a string as x or y data. The datapoint was discarded, because this causes nonsensical graphs.")
             return
+        if weight % 1 != 0.0:
+            warnings.warn(f"WARNING: You are adding a value to this stochastic graph with a non-integer weight ({weight}). This will mean standard deviation is not computed correctly, see https://stats.stackexchange.com/q/6534/360389.")
 
         if series_name not in self.data:
             self.cache[series_name] = dict()  # {input value} -> index in data list
@@ -433,69 +505,75 @@ class StochasticLineGraph(Visual):
         self.data[series_name][index_of_x][1].append(y)
         self.data[series_name][index_of_x][2].append(weight)
 
-    def commit(self, global_options: ArgsGlobal, default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine]=None,
+    def commit(self, global_options: "StochasticLineGraph.ArgsGlobal", default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine]=None,
                export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
         with ProtectedData(self):
-            if extra_line_options is None:
-                extra_line_options = dict()
-
-            if existing_figax is None:
-                fig, main_ax = LineGraph._newFigAx(global_options)
-            else:
-                fig, main_ax = existing_figax
-
-            overlay_graph = LineGraph("-", caching=CacheMode.NONE)
-            new_line_options = dict()
-            styles = LineGraph._makeLineStyleGenerator(advance_by=global_options.initial_style_idx)
+            series_to_x_to_n_w_mu_sigma: Dict[str,Dict[float,Tuple[int,float,float,float]]] = defaultdict(dict)
             for name, samples in self.data.items():
-                # Get style options
-                marker, line, colour = LineGraph._resolveLineStyle(name, False, default_line_options, extra_line_options, styles)
-                options = extra_line_options.get(name, default_line_options)
-                new_line_options[name] = LineGraph.ArgsPerLine(
-                    show_line=options.show_line, show_points=options.show_points,
-                    point_marker=marker, line_style=line, colour=colour
-                )
-
-                # Turn samples into a plottable line.
-                sorted_input         = []
-                average_line         = []
-                upper_deviation_line = []
-                for x, ys, ws in sorted(samples, key=lambda i: i[0]):
-                    n = len(ys)
+                # Turn the samples into a plottable line.
+                for x, ys, ws in samples:
+                    n      = len(ys)
+                    w      = sum(ws)
                     Ybar_n = weightedMean(ys, ws)
                     S_n    = sqrt(weightedVariance(ys, ws, ddof=1))  # S_n² is an unbiased estimator of the variance.
-                    if global_options.twosided_ci_percentage:
-                        remainder_percentage = 100 - global_options.twosided_ci_percentage  # E.g. 5% for 95% CI
-                        one_side_remainder   = remainder_percentage/2                        # => Each side outside the CI captures 2.5%
-                        alpha = (100-one_side_remainder)/100                                 # => Alpha is 0.975.
-                        distribution: scipy.stats.rv_continuous = scipy.stats.t(n-1)
-                        quantile = distribution.ppf(alpha)
-                        deviation = quantile*S_n/sqrt(n)
-                    else:
-                        deviation = S_n
 
-                    sorted_input.append(x)
-                    average_line.append(Ybar_n)
-                    upper_deviation_line.append(deviation)
+                    series_to_x_to_n_w_mu_sigma[name][x] = (n,w,Ybar_n,S_n)
 
-                sorted_input, average_line, upper_deviation_line = np.array(sorted_input), np.array(average_line), np.array(upper_deviation_line)
+            self._commit(
+                global_options=global_options, default_line_options=default_line_options, extra_line_options=extra_line_options,
+                series_to_x_to_n_w_mu_sigma=series_to_x_to_n_w_mu_sigma, export_mode=export_mode, existing_figax=existing_figax
+            )
 
-                # Plotting
-                if options.show_line:
-                    main_ax.fill_between(sorted_input, average_line + upper_deviation_line, average_line - upper_deviation_line,
-                                         color=colour, alpha=global_options.uncertainty_opacity)
-                if options.show_points:
-                    main_ax.errorbar(sorted_input, average_line, yerr=upper_deviation_line, color=colour, fmt='none',
-                                     elinewidth=0.5, capthick=0.5, capsize=0.75, alpha=1.0)
-                overlay_graph.addMany(name, sorted_input, average_line)
 
-            for name, options in extra_line_options.items():
-                if name not in new_line_options:
-                    new_line_options[name] = options
+class StreamingStochasticLineGraph(_PrecomputedStochasticLineGraph):
 
-            fig, main_ax = overlay_graph.commitWithArgs(global_options, default_line_options, new_line_options,
-                                                        export_mode=ExportMode.RETURN_ONLY, existing_figax=(fig, main_ax))
+    def _load(self, saved_data: dict):
+        for series_name, samples in saved_data.items():
+            if not isinstance(samples, list) \
+                    or any(len(tup) != 5 for tup in samples) \
+                    or any(not isinstance(x,  (int,float)) or
+                           not isinstance(n,   int) or
+                           not isinstance(w,  (int,float)) or
+                           not isinstance(ls, (int,float)) or
+                           not isinstance(ss, (int,float)) for x,n,w,ls,ss in samples):
+                raise ValueError("Graph data corrupted. Check the assertions above this line to see what could be wrong.")
 
-            self.exportToPdf(fig, export_mode)
-            if export_mode != ExportMode.SAVE_ONLY:
-                return fig, main_ax
+            self.cache[series_name] = {x: i for i,(x,_,_,_,_) in enumerate(samples)}
+
+        self.data = saved_data
+
+    def addSample(self, series_name: str, x: float, y: float, weight: float=1.0):
+        if type(x) == str or type(y) == str:
+            print("WARNING: You are trying to use a string as x or y data. The datapoint was discarded, because this causes nonsensical graphs.")
+            return
+        if weight % 1 != 0.0:
+            warnings.warn(f"WARNING: You are adding a value to this stochastic graph with a non-integer weight ({weight}). This will mean standard deviation is not computed correctly, see https://stats.stackexchange.com/q/6534/360389.")
+
+        if series_name not in self.data:
+            self.cache[series_name] = dict()  # {input value} -> index in data list.
+            self.data[series_name] = []
+
+        if x not in self.cache[series_name]:
+            self.cache[series_name][x] = len(self.data[series_name])
+            self.data[series_name].append( [x,0,0,0,0] )
+
+        index_of_x = self.cache[series_name][x]
+        self.data[series_name][index_of_x][1] += 1
+        self.data[series_name][index_of_x][2] += weight
+        self.data[series_name][index_of_x][3] += weight*y
+        self.data[series_name][index_of_x][4] += weight*y**2
+
+    def commit(self, global_options: "StreamingStochasticLineGraph.ArgsGlobal", default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine]=None,
+               export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
+        with ProtectedData(self):
+            series_to_x_to_n_w_mu_sigma: Dict[str,Dict[float,Tuple[int,float,float,float]]] = defaultdict(dict)
+            for name, samples in self.data.items():
+                for x, n, w, ls, ss in samples:
+                    Ybar_n = ls/w
+                    S_n    = sqrt(1/(w-1) * (ss - w*Ybar_n**2))  # Not correct when w is a float.
+                    series_to_x_to_n_w_mu_sigma[name][x] = (n,w,Ybar_n,S_n)
+
+            self._commit(
+                global_options=global_options, default_line_options=default_line_options, extra_line_options=extra_line_options,
+                series_to_x_to_n_w_mu_sigma=series_to_x_to_n_w_mu_sigma, export_mode=export_mode, existing_figax=existing_figax
+            )
