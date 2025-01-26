@@ -2,6 +2,7 @@ from ..general import *
 from ..util.printing import lprint
 
 import re
+import math
 
 import dataclasses
 from dataclasses import dataclass
@@ -99,11 +100,21 @@ TableColumn = NamedTree[Dict[int, Any]]
 
 class DeltaMode(Enum):  # Given a reference value r (e.g. 2), how should you compare a given value v (e.g. 3) with it?
     NONE                = 1  # v       == 3
-    ABSOLUTE_DIFFERENCE = 2  # v - r   == +1
-    ABSOLUTE_FRACTION   = 3  # v/r     == 1.5x
-    ABSOLUTE_PERCENTAGE = 4  # 100*v/r == 150%
+    ABSOLUTE_FRACTION   = 2  # v/r     == 1.5x
+    ABSOLUTE_PERCENTAGE = 3  # 100*v/r == 150%
+    RELATIVE_DIFFERENCE = 4  # v - r   == +1
     RELATIVE_FRACTION   = 5  # (v-r)/r == +0.5x
     RELATIVE_PERCENTAGE = 6  # 100*(v-r)/r == +50%
+
+
+class SignMode(Enum):  # How to add signs to a cell relative to the cell_prefix.
+    NONE = 1
+    MINUS_INSIDE_NO_PLUS  = 2
+    MINUS_OUTSIDE_NO_PLUS = 3
+    MINUS_OUTSIDE_PLUS_INSIDE = 4
+    MINUS_INSIDE_PLUS_OUTSIDE = 5
+    BOTH_INSIDE  = 6
+    BOTH_OUTSIDE = 7
 
 
 @dataclass
@@ -119,6 +130,7 @@ class ColumnStyle:
     cell_prefix: str=""
     cell_function: Callable[[float], float] = lambda x: x   # E.g. x/1000
     digits: int=2  # This option might seem redundant given that we allow applying any function, but it takes the burden off the user to apply either round() (which drops zeroes) or something like f"{x:.2f}".
+    signs: SignMode=SignMode.MINUS_INSIDE_NO_PLUS
     cell_suffix: str=""
 
     cell_default_if_empty: str=""
@@ -412,7 +424,7 @@ class Table(Visual):
                         group_aggregates = aggregates_per_column[col_idx][groupkeys_per_columns[col_idx][row_identifier]]
 
                         # Process value: apply cell function, subtract reference (optionally), and round.
-                        modify_cell = style.do_deltas == DeltaMode.NONE or group_aggregates.id_of_first != row_identifier
+                        cell_isnt_baseline = style.do_deltas == DeltaMode.NONE or group_aggregates.id_of_first != row_identifier
                         if isinstance(cell_value, (int, float)):
                             # Compute value
                             cell_value = style.cell_function(cell_value)
@@ -421,31 +433,48 @@ class Table(Visual):
                             bolded = (style.do_bold_minimum and cell_value == group_aggregates.min) or \
                                      (style.do_bold_maximum and cell_value == group_aggregates.max)
 
-                            # Relativise
-                            if modify_cell:
+                            # Relativise (this is done after determining extrema because it may result in infinity)
+                            if cell_isnt_baseline:
                                 ref_value = group_aggregates.value_of_first
-                                if style.do_deltas == DeltaMode.ABSOLUTE_DIFFERENCE:
+                                if style.do_deltas == DeltaMode.RELATIVE_DIFFERENCE:
                                     cell_value = cell_value - ref_value
                                 elif style.do_deltas == DeltaMode.ABSOLUTE_FRACTION:
-                                    cell_value = divideOrDefault(cell_value, ref_value, default=r"$\infty$")
+                                    cell_value = divideOrDefault(cell_value, ref_value, default=math.copysign(math.inf,cell_value))
                                 elif style.do_deltas == DeltaMode.ABSOLUTE_PERCENTAGE:
-                                    cell_value = divideOrDefault(100*cell_value, ref_value, default=r"$\infty$")
+                                    cell_value = divideOrDefault(100*cell_value, ref_value, default=math.copysign(math.inf,cell_value))
                                 elif style.do_deltas == DeltaMode.RELATIVE_FRACTION:
-                                    cell_value = divideOrDefault(cell_value - ref_value, ref_value, default=r"$\infty$")
+                                    cell_value = divideOrDefault(cell_value - ref_value, ref_value, default=math.copysign(math.inf,cell_value-ref_value))
                                 elif style.do_deltas == DeltaMode.RELATIVE_PERCENTAGE:
-                                    cell_value = divideOrDefault(100*(cell_value - ref_value), ref_value, default=r"$\infty$")
+                                    cell_value = divideOrDefault(100*(cell_value - ref_value), ref_value, default=math.copysign(math.inf,cell_value-ref_value))
 
-                            # Format value
-                            if not isinstance(cell_value, str):
-                                cell_string = f"{cell_value:.{style.digits}f}"
-                                if cell_value >= 0 and modify_cell and style.do_deltas in {DeltaMode.ABSOLUTE_DIFFERENCE, DeltaMode.RELATIVE_FRACTION, DeltaMode.RELATIVE_PERCENTAGE}:
-                                    cell_string = "+" + cell_string
-                        else:
-                            cell_string = str(cell_value)
-                            bolded = False
+                            # Sign formatting
+                            definitely_add_sign = style.signs != SignMode.NONE \
+                                                  and cell_isnt_baseline and style.do_deltas in {DeltaMode.RELATIVE_DIFFERENCE,
+                                                                                                 DeltaMode.RELATIVE_FRACTION,
+                                                                                                 DeltaMode.RELATIVE_PERCENTAGE}
+                            if cell_value >= 0:  # Logic for positive numbers.
+                                sign = "+"*(definitely_add_sign or style.signs not in {SignMode.NONE, SignMode.MINUS_INSIDE_NO_PLUS, SignMode.MINUS_OUTSIDE_NO_PLUS})
+                                sign_inside = style.signs in {SignMode.BOTH_INSIDE, SignMode.MINUS_OUTSIDE_PLUS_INSIDE}
+                            else:  # Logic for negative numbers.
+                                sign = "-"*(definitely_add_sign or style.signs != SignMode.NONE)
+                                sign_inside = style.signs in {SignMode.BOTH_INSIDE, SignMode.MINUS_INSIDE_NO_PLUS, SignMode.MINUS_INSIDE_PLUS_OUTSIDE}
 
-                        cell_content = r"\bfseries "*bolded + style.cell_prefix*modify_cell + cell_string + style.cell_suffix*modify_cell
-                    else:
+                            # Convert to string by rounding (unless infinity)
+                            if not math.isinf(cell_value):
+                                cell_absvalue_string = f"{cell_value:.{style.digits}f}".lstrip("-")
+                            else:
+                                cell_absvalue_string = r"$\infty$"
+
+                            # Format
+                            cell_content = r"\bfseries "*bolded \
+                                        + sign*(not sign_inside) \
+                                        + style.cell_prefix*cell_isnt_baseline \
+                                        + sign*sign_inside \
+                                        + cell_absvalue_string \
+                                        + style.cell_suffix*cell_isnt_baseline
+                        else:  # There was a value in the cell, but it was a string. Just copy it to the output.
+                            cell_content = str(cell_value)
+                    else:  # There was no value in the cell. Use the default content instead.
                         cell_content = style.cell_default_if_empty
 
                     if not right_border:
