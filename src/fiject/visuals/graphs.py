@@ -400,7 +400,11 @@ class _PrecomputedStochasticLineGraph(Visual):
         uncertainty_opacity: float = 0.0
         twosided_ci_percentage: float = None
 
-    def _commit(self, global_options: ArgsGlobal, default_line_options: LineGraph.ArgsPerLine, extra_line_options: Dict[str,LineGraph.ArgsPerLine],
+    @dataclass
+    class ArgsPerLine(LineGraph.ArgsPerLine):
+        pass
+
+    def _commit(self, global_options: ArgsGlobal, default_line_options: ArgsPerLine, extra_line_options: Dict[str,ArgsPerLine],
                 series_to_x_to_n_w_mu_sigma: Dict[str,Dict[float,Tuple[int,float,float,float]]],
                 export_mode: ExportMode=ExportMode.SAVE_ONLY, existing_figax: tuple=None):
         if extra_line_options is None:

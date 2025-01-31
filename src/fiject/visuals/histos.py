@@ -593,7 +593,7 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
 
         return results
 
-    def commit(self, global_args: ArgsGlobal, bin_reweighting: Dict[int,float]=None, **seaborn_args):
+    def commit(self, global_args: ArgsGlobal, bin_reweighting: Union[Dict[str,Dict[int,float]],Dict[int,float]]=None, **seaborn_args):
         """
         :param bin_reweighting: multipliers to apply to the counts in the original bins.
                                 Normally, in histograms, it is samples that are weighted, but since a StreamingHistogram
@@ -603,6 +603,11 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
         with ProtectedData(self):
             if bin_reweighting is None:
                 bin_reweighting = dict()
+
+            if not bin_reweighting or isinstance(next(bin_reweighting.keys()), str):  # No default given.
+                default_reweighting = dict()
+            else:
+                default_reweighting = bin_reweighting
 
             # First of all: find the last non-empty bin. Even if the binspec says the bin set is half-open, you have to close it when visualising!
             if not self.bins.isClosed():
@@ -630,7 +635,7 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
                 data_in_compressed_bins[class_name] = defaultdict(float)
                 for original_bin_index, count in counts.items():
                     new_bin_index = original_bin_index // global_args.combine_buckets
-                    data_in_compressed_bins[class_name][new_bin_index] += count * bin_reweighting.get(original_bin_index, 1)
+                    data_in_compressed_bins[class_name][new_bin_index] += count * bin_reweighting.get(class_name,default_reweighting).get(original_bin_index, 1)
                     nonzero_bins.add(new_bin_index)
 
             # Convert the data to lists with a definite order.
