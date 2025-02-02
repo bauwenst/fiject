@@ -504,7 +504,7 @@ class Table(Visual):
             all_lines = first_line + "\n" + content_lines + "\n" + last_line
 
             if export_mode != ExportMode.RETURN_ONLY:
-                Visual.writeLines([all_lines], self.name, ".tex", overwrite_if_possible=self.overwrite)
+                Visual.writeLines([all_lines], self.name, ".tex", overwrite_if_possible=self._overwrite)
             if export_mode != ExportMode.SAVE_ONLY:
                 return all_lines
 

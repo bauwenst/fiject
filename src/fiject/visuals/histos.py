@@ -212,10 +212,16 @@ class MultiHistogram(Visual):
                        value_tickspacing=None):
         """
         Draws multiple boxplots side-by-side.
+
         Note: the "log" option doesn't just stretch the value axis, because in
         that case you will get a boxplot on skewed data and then stretch that bad
         boxplot. Instead, this method applies log10 to the values, then computes
         the boxplot, and plots it on a regular axis.
+
+        FIXME: Actually, come to think of it, a boxplot measures quartiles and the mean. The mean is affected by log(),
+               but the quartiles are not since the logarithm is monotonous, so the box itself would actually be displayed
+               exactly the same if you first computed the box and then displayed its limits on a log axis (rather than
+               logging its limits and displaying them on a linear axis).
         """
         self.commitWithArgs_boxplot(MultiHistogram.ArgsGlobal_BoxPlot(
             iqr_limit=iqr_limit,
@@ -430,7 +436,7 @@ class _PrecomputedMultiHistogram(Visual):
 
         x_lims: Optional[Tuple[Optional[float], Optional[float]]]=None
         # log_x: bool = False
-        # log_y: bool = False
+        log_y: bool=False
 
     def _commitGivenBars(self, global_args: ArgsGlobal, bar_left_edges: List[float], bar_heights: Dict[str,List[float]], closed_bin_spec: BinSpec,
                          disable_memory_safety: bool=False, **seaborn_args):
@@ -496,9 +502,12 @@ class _PrecomputedMultiHistogram(Visual):
         if global_args.x_tickspacing:
             ax.xaxis.set_major_locator(tkr.MultipleLocator(global_args.x_tickspacing))
             ax.xaxis.set_major_formatter(tkr.ScalarFormatter())
-        if global_args.y_tickspacing:
-            ax.yaxis.set_major_locator(tkr.MultipleLocator(global_args.y_tickspacing))
-            ax.yaxis.set_major_formatter(tkr.ScalarFormatter())
+        if not global_args.log_y:
+            if global_args.y_tickspacing:
+                ax.yaxis.set_major_locator(tkr.MultipleLocator(global_args.y_tickspacing))
+                ax.yaxis.set_major_formatter(tkr.ScalarFormatter())
+        else:
+            ax.set_yscale("log")
 
         ax.set_axisbelow(True)
         ax.grid(True, axis="y", linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
@@ -526,6 +535,12 @@ class StreamingMultiHistogram(_PrecomputedMultiHistogram):
                  caching: CacheMode=CacheMode.NONE, overwriting: bool=False):
         self.bins = binspec
         super().__init__(name=name, caching=caching, overwriting=overwriting)
+
+    def copy(self, name: str) -> Self:
+        new = self.__class__(name, binspec=self.bins, caching=self._caching, overwriting=self._overwrite)
+        new.data  = deepcopy(self.data)
+        new.cache = deepcopy(self.cache)
+        return new
 
     def clear(self):
         super().clear()

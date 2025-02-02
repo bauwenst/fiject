@@ -1,6 +1,7 @@
 # --- Imports needed by basically every file ---
 from pathlib import Path
 from typing import Union, Sequence, Tuple, List, Dict, Callable, Iterable, Optional
+from typing_extensions import Self
 from enum import Enum
 from abc import ABC, abstractmethod
 
@@ -123,11 +124,7 @@ class Visual(ABC):
                         and load those data into the object. Also determines whether commit methods will store data.
         :param overwriting: Whether to overwrite the youngest found versions of the files to save.
         """
-        self.name = name
-        if FIJECT_DEFAULTS.GLOBAL_STEM_PREFIX and not name.startswith(FIJECT_DEFAULTS.GLOBAL_STEM_PREFIX + "_"):
-            self.name = FIJECT_DEFAULTS.GLOBAL_STEM_PREFIX + "_" + self.name
-        if FIJECT_DEFAULTS.GLOBAL_STEM_SUFFIX and not name.endswith("_" + FIJECT_DEFAULTS.GLOBAL_STEM_SUFFIX):
-            self.name = self.name + "_" + FIJECT_DEFAULTS.GLOBAL_STEM_SUFFIX
+        self.raw_name = name
 
         self.data  = dict()  # All figure classes are expected to store their data in a dictionary by default, so that saving doesn't need to be re-implemented each time.
         self.cache = dict()  # For runtime acceleration if you want it. Is not stored.
@@ -136,7 +133,8 @@ class Visual(ABC):
 
         self.needs_computation = (caching == CacheMode.NONE or caching == CacheMode.WRITE_ONLY)
         self.will_be_stored    = (caching == CacheMode.WRITE_ONLY)
-        self.overwrite = overwriting
+        self._overwrite = overwriting
+        self._caching   = caching
         if caching == CacheMode.READ_ONLY or caching == CacheMode.IF_MISSING:
             already_exists = False
 
@@ -215,9 +213,18 @@ class Visual(ABC):
 
     ### IMPLEMENTATIONS
 
+    @property
+    def name(self) -> str:
+        name = self.raw_name
+        if FIJECT_DEFAULTS.GLOBAL_STEM_PREFIX and not name.startswith(FIJECT_DEFAULTS.GLOBAL_STEM_PREFIX + "_"):
+            name = FIJECT_DEFAULTS.GLOBAL_STEM_PREFIX + "_" + name
+        if FIJECT_DEFAULTS.GLOBAL_STEM_SUFFIX and not name.endswith("_" + FIJECT_DEFAULTS.GLOBAL_STEM_SUFFIX):
+            name = name + "_" + FIJECT_DEFAULTS.GLOBAL_STEM_SUFFIX
+        return name
+
     def exportToPdf(self, fig, export_mode: ExportMode=ExportMode.SAVE_ONLY, stem_suffix: str=""):
         if export_mode != ExportMode.RETURN_ONLY:  # if export_mode != don't save
-            Visual.writeFigure(figure=fig, stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, overwrite_if_possible=self.overwrite)
+            Visual.writeFigure(figure=fig, stem=self.name + stem_suffix, suffix="." + FIJECT_DEFAULTS.RENDERING_FORMAT, overwrite_if_possible=self._overwrite)
         if export_mode == ExportMode.SAVE_ONLY:  # if export_mode == don't return
             plt.close(fig)
 
@@ -229,7 +236,7 @@ class Visual(ABC):
             },
             "metadata": metadata or dict(),
             "data": self._save()  # TODO: This is very, very inefficient. You should store data not as ASCII but as a binary file or in some other compressed format.
-        }, stem=self.name, overwrite_if_possible=self.overwrite)
+        }, stem=self.name, overwrite_if_possible=self._overwrite)
 
     def load(self, json_path: Path) -> dict:
         """
@@ -256,6 +263,16 @@ class Visual(ABC):
         """
         self.data = dict()
         self.cache = dict()
+
+    def copy(self, name: str) -> Self:
+        """
+        Copy the data stored in this object into a new object with a different name.
+        If you override the constructor, you also have to override this method (and not call it with super).
+        """
+        new = self.__class__(name, caching=self._caching, overwriting=self._overwrite)
+        new.data  = deepcopy(self.data)
+        new.cache = deepcopy(self.cache)
+        return new
 
     def isEmpty(self) -> bool:
         return Visual._isEmpty(self.data)

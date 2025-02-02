@@ -13,12 +13,6 @@ class ScatterPlot(Visual):
     def _load(self, saved_data: dict):
         self.data = saved_data  # FIXME: Needs more sanity checks obviously
 
-    def copy(self, new_name: str):
-        new_plot = ScatterPlot(new_name, caching=CacheMode.NONE)
-        for name, values in self.data.items():
-            new_plot.addPointsToFamily(name, values[0].copy(), values[1].copy())
-        return new_plot
-
     def addPointsToFamily(self, family_name: str, xs: Iterable[float], ys: Iterable[float]):
         """
         Unlike the other `Visual`s, it seems justified to add scatterplot points in bulk.

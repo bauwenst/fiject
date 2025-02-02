@@ -21,6 +21,6 @@ from matplotlib import rc
 # Enable LaTeX support if available (https://stackoverflow.com/a/75478997/9352077)
 import shutil
 
-if shutil.which('latex'):
-    rc('font', **{'serif': ['Computer Modern']})
-    rc('text', usetex=True)
+if shutil.which("latex"):
+    rc("font", **{"serif": ["Computer Modern"]})
+    rc("text", usetex=True)
