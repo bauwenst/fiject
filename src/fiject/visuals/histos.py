@@ -435,6 +435,7 @@ class _PrecomputedMultiHistogram(Visual):
         # do_hatch: bool = False
 
         x_lims: Optional[Tuple[Optional[float], Optional[float]]]=None
+        y_lims: Optional[Tuple[Optional[float], Optional[float]]]=None
         # log_x: bool = False
         log_y: bool=False
 
@@ -498,6 +499,8 @@ class _PrecomputedMultiHistogram(Visual):
         # Finally, if the user has specified custom x limits, set those. (Setting None leaves a bound unchanged.)
         if global_args.x_lims:
             ax.set_xlim(left=global_args.x_lims[0], right=global_args.x_lims[1])
+        if global_args.y_lims:
+            ax.set_ylim(bottom=global_args.y_lims[0], top=global_args.y_lims[1])
 
         if global_args.x_tickspacing:
             ax.xaxis.set_major_locator(tkr.MultipleLocator(global_args.x_tickspacing))
