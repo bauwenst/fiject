@@ -437,7 +437,8 @@ class _PrecomputedMultiHistogram(Visual):
         x_lims: Optional[Tuple[Optional[float], Optional[float]]]=None
         y_lims: Optional[Tuple[Optional[float], Optional[float]]]=None
         # log_x: bool = False
-        log_y: bool=False
+        log_y: bool = False
+        do_legend: bool = True
 
     def _commitGivenBars(self, global_args: ArgsGlobal, bar_left_edges: List[float], bar_heights: Dict[str,List[float]], closed_bin_spec: BinSpec,
                          disable_memory_safety: bool=False, **seaborn_args):
@@ -484,8 +485,11 @@ class _PrecomputedMultiHistogram(Visual):
             **seaborn_args
         )
 
-        if len(bar_heights) > 1:
-            ax.get_legend().set_title(None)  # Legend title is unnecessary clutter.
+        if global_args.do_legend:
+            if len(bar_heights) > 1:
+                ax.get_legend().set_title(None)  # Legend title is unnecessary clutter.
+        else:
+            ax.get_legend().set_visible(False)
 
         ax.set_xlabel(global_args.x_label)
         ax.set_ylabel(global_args.y_label + r" [\%]" * (mode == "percent" and global_args.y_label != ""))
