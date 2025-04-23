@@ -264,21 +264,21 @@ class Table(Visual):
             #     first_line += default_column_style.alignment*top_level_column.width()
             first_line += "}"
 
-            # STEP 2: Get all header lines and where the borders are at each header level
+            # STEP 2: Get all header lines, and simultaneously a map of where the borders are at each header level
             header_lines = []
 
             level_has_edge_after_ncols = []
             frontier = table.children
-            for header_line_idx in range(header_height):  # Vertical iteration
+            for header_line_idx in range(header_height):  # Vertical iteration: current visual line in the rendered table.
                 line = "&"*(margin_depth-1)
                 level_has_edge_after_ncols.append([0])
                 cumulative_width = 0
                 new_frontier = []
-                for frontier_idx, col in enumerate(frontier):  # Horizontal iteration
+                for frontier_idx, col in enumerate(frontier):  # Horizontal iteration: the frontier contains each column header that has not been rendered, and whose ancestors are not still in the frontier. This means everything in the frontier is AT LEAST as deep as the current visual line, but may be deeper. This also means the end of the frontier is also the end of the table at all depths.
                     line += " & "
                     width = col.width()
                     cumulative_width += width
-                    if col.height() >= header_height-header_line_idx:  # This is where you enter all columns on the same header level. Very useful.
+                    if col.height() >= header_height-header_line_idx:  # This clause is triggered for all columns that have a header at exactly the current visual line.
                         new_frontier.extend(col.children)
 
                         # Is this level one with borders, or does it have a border for a previous level, or neither?
@@ -309,7 +309,8 @@ class Table(Visual):
                             level_has_edge_after_ncols[-1].append(width)
                         else:
                             level_has_edge_after_ncols[-1][-1] = width
-                        level_has_edge_after_ncols[-1].append(0)
+                        if frontier_idx != len(frontier)-1:
+                            level_has_edge_after_ncols[-1].append(0)
                     else:  # Column starts lower in the table. Re-schedule it for rendering later.
                         new_frontier.append(col)
 
@@ -318,8 +319,7 @@ class Table(Visual):
                 line += r" \\"
                 header_lines.append(line)
 
-                level_has_edge_after_ncols[-1] = level_has_edge_after_ncols[-1][:-2]  # Trim off last 0 and also last column since we don't want the edge of the table to have a border.
-                level_has_edge_after_ncols[-1] = [sum(level_has_edge_after_ncols[-1][:i+1]) for i in range(len(level_has_edge_after_ncols[-1]))]  # cumsum
+                level_has_edge_after_ncols[-1] = [sum(level_has_edge_after_ncols[-1][:i+1]) for i in range(len(level_has_edge_after_ncols[-1][:-1]))]  # cumsum
                 frontier = new_frontier
             header_lines[-1] += r"\hline\hline" if not do_hhline_syntax else \
                                 r"\hhline{*{" + str(margin_depth+table.width()) + r"}{=}}"
