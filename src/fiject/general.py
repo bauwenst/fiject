@@ -228,15 +228,20 @@ class Visual(ABC):
         if export_mode == ExportMode.SAVE_ONLY:  # if export_mode == don't return
             plt.close(fig)
 
-    def save(self, metadata: dict=None):
-        Visual.writeDictionary(data={
+    def checkpoint(self, metadata: dict=None) -> dict:
+        """Return the visual's data as a dictionary, along with metadata about timing."""
+        return {
             "time": {
                 "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "start-to-finish-secs": round(time.perf_counter() - self.creation_time, 2),
             },
             "metadata": metadata or dict(),
             "data": self._save()  # TODO: This is very, very inefficient. You should store data not as ASCII but as a binary file or in some other compressed format.
-        }, stem=self.name, overwrite_if_possible=self._overwrite)
+        }
+
+    def save(self, metadata: dict=None):
+        """Checkpoint the visual and safely write it to a dictionary."""
+        Visual.writeDictionary(data=self.checkpoint(metadata), stem=self.name, overwrite_if_possible=self._overwrite)
 
     def load(self, json_path: Path) -> dict:
         """
