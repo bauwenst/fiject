@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # --- Globally used variables ---
-from .defaults import FIJECT_DEFAULTS, niceColours, cycleNiceColours, cycleRainbowColours
+from .defaults import FIJECT_DEFAULTS, niceColours, cycleNiceColours, cycleRainbowColours, rainbowColours
 
 
 AspectRatio = Tuple[float,float]

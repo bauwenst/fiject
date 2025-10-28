@@ -65,5 +65,8 @@ def cycleNiceColours() -> Iterator:  # Can be iterated repeatedly
 
 import matplotlib.pyplot as plt
 import numpy as np
+def rainbowColours(amount_of_points: int) -> list:
+    return list(plt.cm.rainbow(np.linspace(0, 1, amount_of_points)))[::-1]
+
 def cycleRainbowColours(amount_of_points: int) -> Iterator:
-    return itertools.cycle(plt.cm.rainbow(np.linspace(0, 1, amount_of_points)))  # TODO: "gist_rainbow" and "jet" are both superior, and "hsv" is cyclic.
+    return itertools.cycle(rainbowColours(amount_of_points))  # TODO: "gist_rainbow" and "jet" are both superior, and "hsv" is cyclic.

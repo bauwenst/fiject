@@ -67,6 +67,17 @@ The last command will detect the `pyproject.toml` file (`pip install`), look for
 current directory (`.`), and put a symlink to this folder in Python's `site-packages` folder (`-e`). This means that
 when you `import fiject`, it is imported from the current folder and hence any changes you make here are applied immediately.
 
+### Troubleshooting
+If, on a commit, you get an error that includes the text `This is pdfTeX` and under it something along the lines of
+```
+! LaTeX Error: File `type1cm.sty' not found.
+```
+you are likely on Linux Ubuntu and want to run
+```shell
+sudo apt install dvipng texlive-latex-extra texlive-fonts-recommended cm-super
+```
+taken from [this thread](https://stackoverflow.com/questions/11354149/python-unable-to-render-tex-in-matplotlib).
+
 ## Credit
 This package was developed over the span of multiple years (2021-2023) and across multiple research papers at university.
 If you produce figures for your own reports with this package, please be a kind human and acknowledge my work by crediting

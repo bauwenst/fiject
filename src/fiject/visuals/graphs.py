@@ -26,10 +26,12 @@ class LineGraph(Visual):
         x_label: str = ""
         y_label: str = ""
         legend_position: str = "lower right"
-        initial_style_idx: int = 0
         grid_linewidth: float = None
         curve_linewidth: float = 1
         optional_line_at_y: float = None
+
+        initial_style_idx: int = 0
+        rainbow_colours: bool = False
 
         x_gridspacing: float = None
         y_gridspacing: float = None
@@ -157,7 +159,7 @@ class LineGraph(Visual):
                 all_series.append((name, (xs,ys)))
 
             # Plotting
-            styles = LineGraph._makeLineStyleGenerator(advance_by=do.initial_style_idx)
+            styles = LineGraph._makeLineStyleGenerator(advance_by=do.initial_style_idx, rainbow_colours=0 if not do.rainbow_colours else len(all_series))
             for name, (xs,ys) in all_series:
                 # Get style options
                 is_function = name in do.functions
@@ -187,7 +189,7 @@ class LineGraph(Visual):
             if do.y_label:
                 main_ax.set_ylabel(do.y_label)
             if do.legend_position:  # Can be None or "" to turn it off.
-                main_ax.legend(loc=do.legend_position)
+                main_ax.legend(loc=do.legend_position)  # If you want the legend outside, add something like bbox_to_anchor=(1, 0.5)
 
             if do.y_lims:
                 main_ax.set_ylim(do.y_lims[0], do.y_lims[1])
@@ -291,7 +293,7 @@ class LineGraph(Visual):
         return fig, main_ax
 
     @staticmethod
-    def _makeLineStyleGenerator(advance_by: int=0):
+    def _makeLineStyleGenerator(advance_by: int=0, rainbow_colours: int=0):
         """
         The graph style is a tuple (col, line, marker) that cycles from front to back:
           - red solid dot, blue solid dot, green solid dot
@@ -300,7 +302,8 @@ class LineGraph(Visual):
           - red solid x, blue solid x, green solid x
           - ...
         """
-        colours = niceColours()
+        colours = niceColours() if rainbow_colours <= 0 else rainbowColours(rainbow_colours)
+
         lines   = ["-", "--", ":"]
         markers = [".", "x", "+"]
         styles = itertools.cycle(itertools.product(markers, lines, colours))  # Note: itertools.product consumes its arguments, which is why you can't use an infinite cycle for it.

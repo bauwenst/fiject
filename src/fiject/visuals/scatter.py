@@ -38,7 +38,7 @@ class ScatterPlot(Visual):
         y_lims: Tuple[float, float] = None
         logx: bool = False
         logy: bool = False
-        legend: bool = False
+        legend: str = ""
         x_tickspacing: float = None
         y_tickspacing: float = None
         grid_x: bool = False
@@ -88,9 +88,8 @@ class ScatterPlot(Visual):
             cols    = cycleRainbowColours(len(data))        if do.default_colours_rainbow else cycleNiceColours()
             scatters = []
             names    = []
-            for name, family in sorted(data.items(), reverse=True):
-                options = extra_family_options.get(name, default_family_options)
-
+            in_order = [(name, family, extra_family_options.get(name, default_family_options)) for name, family in data.items()]
+            for name, family, options in reversed(in_order):
                 marker = options.marker if options.marker is not None else next(markers)
                 colour = options.colour if options.colour is not None else next(cols)
                 size   = options.size
@@ -114,7 +113,10 @@ class ScatterPlot(Visual):
                         linewidth=FIJECT_DEFAULTS.GRIDWIDTH)
 
             if do.legend:
-                ax.legend(scatters, names, loc='upper left', markerscale=10, ncol=2)  # https://stackoverflow.com/questions/17411940/matplotlib-scatter-plot-legend
+                if "outside" in do.legend:
+                    fig.legend(scatters[::-1], names[::-1], loc=do.legend, bbox_to_anchor=(1.15,0.1), markerscale=2*FIJECT_DEFAULTS.ASPECT_RATIO_SIZEUP)
+                else:
+                    ax.legend(scatters[::-1], names[::-1], loc=do.legend, markerscale=2*FIJECT_DEFAULTS.ASPECT_RATIO_SIZEUP)  # https://stackoverflow.com/questions/17411940/matplotlib-scatter-plot-legend
 
             self.exportToPdf(fig, export_mode)
             if export_mode != ExportMode.SAVE_ONLY:
