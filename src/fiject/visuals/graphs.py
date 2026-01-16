@@ -159,6 +159,8 @@ class LineGraph(Visual):
                 all_series.append((name, (xs,ys)))
 
             # Plotting
+            results = []
+            names   = []
             styles = LineGraph._makeLineStyleGenerator(advance_by=do.initial_style_idx, rainbow_colours=0 if not do.rainbow_colours else len(all_series))
             for name, (xs,ys) in all_series:
                 # Get style options
@@ -172,13 +174,16 @@ class LineGraph(Visual):
 
                 xs, ys = zip(*sorted(zip(xs,ys)))
                 if do.logx and do.logy:
-                    main_ax.loglog(  xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
+                    result = main_ax.loglog(  xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
                 elif do.logx:
-                    main_ax.semilogx(xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
+                    result = main_ax.semilogx(xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
                 elif do.logy:
-                    main_ax.semilogy(xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
+                    result = main_ax.semilogy(xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
                 else:
-                    main_ax.plot(    xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
+                    result = main_ax.plot(    xs, ys, style, c=colour, label=name, linewidth=do.curve_linewidth)
+
+                results.append(result)
+                names.append(name)
 
             if do.optional_line_at_y is not None:
                 main_ax.hlines(do.optional_line_at_y, min_x, max_x,
@@ -189,7 +194,14 @@ class LineGraph(Visual):
             if do.y_label:
                 main_ax.set_ylabel(do.y_label)
             if do.legend_position:  # Can be None or "" to turn it off.
-                main_ax.legend(loc=do.legend_position)  # If you want the legend outside, add something like bbox_to_anchor=(1, 0.5)
+                # FIXME: Somehow doesn't work. ---> UserWarning: Legend does not support handles for list instances. A proxy artist may be used instead.
+                # if "outside" in do.legend_position:
+                #     fig.legend(results[::-1], names[::-1], loc=do.legend_position, bbox_to_anchor=(1.15, 0.1), markerscale=2*FIJECT_DEFAULTS.ASPECT_RATIO_SIZEUP)  # Yes, the 'fig' is on purpose.
+                # else:
+                #     main_ax.legend(results[::-1], names[::-1], loc=do.legend_position, markerscale=2*FIJECT_DEFAULTS.ASPECT_RATIO_SIZEUP)
+                if "outside" in do.legend_position:
+                    do.legend_position = " ".join(reversed(do.legend_position.replace("outside", "").strip().split()))
+                main_ax.legend(loc=do.legend_position)
 
             if do.y_lims:
                 main_ax.set_ylim(do.y_lims[0], do.y_lims[1])

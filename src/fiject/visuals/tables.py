@@ -125,6 +125,7 @@ class ColumnStyle:
     do_bold_maximum: bool=False  # This is applied AFTER the cell functions and BEFORE rounding.
     do_bold_minimum: bool=False  # idem
     do_deltas: DeltaMode=DeltaMode.NONE  # Will output the first row of the group as-is, and for the others, the difference or ratio with that row.
+    do_aggregated_blob: bool=False  # Will turn the entire column group into a single multi-row cell with its reference value (i.e. the first in the group) in the center.
 
     # Cellwise. E.g.: to format a tokeniser's vocabulary size, you'd use function=lambda x: x/1000, digits=1, suffix="k"
     cell_prefix: str=""
@@ -221,12 +222,15 @@ class Table(Visual):
         for leaf_column in self.data["column-tree"].getLeaves():
             leaf_column.content = {int(key): value for key,value in leaf_column.content.items()}
 
-    def commit(self, rowname_alignment="l",
+    def commit(self, rowname_alignment="l", name_columns: list[str]=None, name_column_alignment: str="c",
                borders_between_columns_of_level: List[int]=None, borders_between_rows_of_level: List[int]=None,
                default_column_style: ColumnStyle=None, alternate_column_styles: Dict[Tuple[str,...], ColumnStyle]=None,
                do_hhline_syntax=True, do_align_ampersands=True, body_only: bool=False, export_mode: ExportMode=ExportMode.SAVE_ONLY):  # TODO: Needs to replace any & in col/row names by \&.
         """
         :param rowname_alignment: How to align row names (choose between "l", "c" and "r").
+        :param name_columns: If n strings are given, the last n columns of the row names (before the double vertical line)
+                             will be separated off with a single line, receive vertical labels, and be printed for every
+                             row regardless of whether e.g. the first of the n is the same for all rows and would hence be printed only once normally.
         :param borders_between_columns_of_level: List of layer indices that cause vertical lines to be drawn in the table
                                                  when a new column starts at that layer of the table header.
                                                  The top layer is layer 0, the under it is layer 1, etc.
@@ -241,6 +245,8 @@ class Table(Visual):
             margin_depth  = self.getRowTree().height() - 1
 
             # Style imputation
+            if name_columns is None:
+                name_columns = []
             if default_column_style is None:
                 default_column_style = ColumnStyle()
             if alternate_column_styles is None:
@@ -255,7 +261,7 @@ class Table(Visual):
                 raise ValueError(f"This table has {margin_depth} row levels, with identifiers 0 to {margin_depth-1}. You gave {borders_between_rows_of_level}.")
 
             # STEP 1: Make first line. Note that there are no default borders (indicated with | normally). Everything is regulated by multicolumn below.
-            first_line = r"\begin{tabular}{" + (rowname_alignment*margin_depth + "||")*(not body_only)
+            first_line = r"\begin{tabular}{" + (rowname_alignment*(margin_depth - len(name_columns)) + "|"*(len(name_columns) > 0) + name_column_alignment*len(name_columns) + "||")*(not body_only)
             for path in table.getPaths():
                 identifier = tuple(node.name for node in path[1:])
                 style = alternate_column_styles.get(identifier, default_column_style)
@@ -270,7 +276,14 @@ class Table(Visual):
             level_has_edge_after_ncols = []
             frontier = table.children
             for header_line_idx in range(header_height):  # Vertical iteration: current visual line in the rendered table.
-                line = "&"*(margin_depth-1)
+                # Part belonging to the row names
+                if header_line_idx != header_height - 1:
+                    line = "&"*margin_depth
+                else:
+                    line = "&"*(margin_depth - len(name_columns)) + "".join(r"\rotatebox{90}{\rlap{" + name + "}} &" for name in name_columns)
+                line = line[:-1]
+
+                # Part belonging to the body
                 level_has_edge_after_ncols.append([0])
                 cumulative_width = 0
                 new_frontier = []
@@ -380,14 +393,16 @@ class Table(Visual):
                     if row_depth_idx != 0:
                         line += " & "
 
+                    no_multirow = row_depth_idx >= margin_depth - len(name_columns)
+
                     name = node.name if node is not None else None
-                    if prev_names[row_depth_idx] != name:
+                    if prev_names[row_depth_idx] != name or no_multirow:
                         row_path_changed = True
                         prev_names[row_depth_idx] = name
 
                     if row_path_changed and node is not None:  # Reprint every name on the path if a parent changed, even if that name hasn't changed since the row above.
                         width = node.width()
-                        if width > 1:
+                        if width > 1 and not no_multirow:
                             line += r"\multirow{" + str(width) + "}{*}{" + node.name + "}"
                         else:
                             line += node.name
@@ -424,7 +439,8 @@ class Table(Visual):
                         group_aggregates = aggregates_per_column[col_idx][groupkeys_per_columns[col_idx][row_identifier]]
 
                         # Process value: apply cell function, subtract reference (optionally), and round.
-                        cell_isnt_baseline = style.do_deltas == DeltaMode.NONE or group_aggregates.id_of_first != row_identifier
+                        cell_isnt_baseline = group_aggregates.id_of_first != row_identifier
+                        format_normally    = cell_isnt_baseline or style.do_deltas == DeltaMode.NONE
                         if isinstance(cell_value, (int, float)):
                             # Compute value
                             cell_value = style.cell_function(cell_value)
@@ -447,7 +463,7 @@ class Table(Visual):
                                 elif style.do_deltas == DeltaMode.RELATIVE_PERCENTAGE:
                                     cell_value = divideOrDefault(100*(cell_value - ref_value), ref_value, default=math.copysign(math.inf,cell_value-ref_value))
 
-                            # Sign formatting
+                            # Sign formatting (the first 'and' is because definitely_add_sign is specifically about deltas)
                             definitely_add_sign = style.signs != SignMode.NONE \
                                                   and cell_isnt_baseline and style.do_deltas in {DeltaMode.RELATIVE_DIFFERENCE,
                                                                                                  DeltaMode.RELATIVE_FRACTION,
@@ -468,10 +484,16 @@ class Table(Visual):
                             # Format
                             cell_content = r"\bfseries "*bolded \
                                         + sign*(not sign_inside) \
-                                        + style.cell_prefix*cell_isnt_baseline \
+                                        + style.cell_prefix*format_normally \
                                         + sign*sign_inside \
                                         + cell_absvalue_string \
-                                        + style.cell_suffix*cell_isnt_baseline
+                                        + style.cell_suffix*format_normally
+                            if style.do_aggregated_blob:
+                                if cell_isnt_baseline:
+                                    cell_content = ""  # For non-baselines you should not have cell content due to multirow.
+                                else:
+                                    height = row_path[style.aggregate_at_rowlevel].width() if style.aggregate_at_rowlevel >= 0 else self.getRowTree().width()
+                                    cell_content = r"\multirow{" + str(height) + "}{*}{" + cell_content + "}"
                         else:  # There was a value in the cell, but it was a string. Just copy it to the output.
                             cell_content = str(cell_value)
                     else:  # There was no value in the cell. Use the default content instead.
