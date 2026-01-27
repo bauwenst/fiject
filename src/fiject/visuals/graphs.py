@@ -21,32 +21,35 @@ class LineGraph(Visual):
     class ArgsGlobal:
         aspect_ratio: Tuple[float,float] = None
         do_spines: bool=True
-        y_lims: Tuple[Optional[float], Optional[float]] = None
-
-        x_label: str = ""
-        y_label: str = ""
         legend_position: str = "lower right"
         grid_linewidth: float = None
-        curve_linewidth: float = 1
+
+        x_label: str = ""
+        x_lims: Tuple[Optional[float], Optional[float]] = None
+        x_gridspacing: float = None
+        x_tickspacing: float = None
+        x_ticks_hardcoded: list = None
+        logx: bool = False
+        logx_becomes_linear_at: float = 0.0  # If this is changed to a non-zero number, a logarithmic x-axis will be cut off and mirrored around 0.
+
+        y_label: str = ""
+        y_lims: Tuple[Optional[float], Optional[float]] = None
+        y_gridspacing: float = None
+        y_tickspacing: float = None
+        logy: bool = False
         optional_line_at_y: float = None
 
+        tick_scientific_notation: bool = False  # Not 10 000 but 1*10^4.
+        tick_log_multiples: bool = False  # Instead of ticking 10^1, 10^2, 10^3... also tick 2*10^1, 3*10^1, 4*10^1...
+
+        curve_linewidth: float = 1
         initial_style_idx: int = 0
         rainbow_colours: bool = False
 
-        x_gridspacing: float = None
-        y_gridspacing: float = None
-        x_tickspacing: float = None
-        y_tickspacing: float = None
-        x_ticks_hardcoded: list = None
-        logx: bool = False
-        logy: bool = False
-        tick_scientific_notation: bool = False  # Not 10 000 but 1*10^4.
-        tick_log_multiples: bool = False  # Instead of ticking 10^1, 10^2, 10^3... also tick 2*10^1, 3*10^1, 4*10^1...
-        
-        logx_becomes_linear_at: float = 0.0  # If this is changed to a non-zero number, a logarithmic x-axis will be cut off and mirrored around 0.
-
         functions: Dict[str,Callable[[float],float]] = None  # Functions you want to evaluate on-the-fly during a commit.
         function_samples: int = 100
+
+        figax_callback: Callable[[plt.Figure,plt.Axes],None] = None
 
     @dataclass
     class ArgsPerLine:
@@ -142,12 +145,19 @@ class LineGraph(Visual):
                 fig, main_ax = existing_figax
 
             # Get all data, including procedurally generated data.
-            try:
-                min_x = min(min(xs) for _,(xs,_) in self.data.items())
-                max_x = max(max(xs) for _,(xs,_) in self.data.items())
-            except:  # TODO: If you ever add x_lims, those should definitely go here.
-                min_x = -1
-                max_x = +1
+            if not do.x_lims:
+                do.x_lims = (None,None)
+            min_x, max_x = do.x_lims
+            if min_x is None:
+                try:
+                    min_x = min(min(xs) for _,(xs,_) in self.data.items())
+                except:
+                    min_x = -1
+            if max_x is None:
+                try:
+                    max_x = max(max(xs) for _,(xs,_) in self.data.items())
+                except:
+                    max_x = +1
 
             all_series = [(name, xy) for name, xy in self.data.items()]
             if not do.logx:
@@ -234,17 +244,22 @@ class LineGraph(Visual):
             if do.y_lims:  # Yes, twice. Don't ask.
                 main_ax.set_ylim(do.y_lims[0], do.y_lims[1])
 
+            if do.x_lims:  # This is true because we impute it to (None,None) anyway.
+                main_ax.set_xlim(do.x_lims[0], do.x_lims[1])
+
             if do.x_gridspacing or do.y_gridspacing:
                 if do.x_gridspacing:
                     main_ax.xaxis.set_minor_locator(tkr.MultipleLocator(do.x_gridspacing))
                 if do.y_gridspacing:
-                    main_ax.yaxis.set_minor_locator(tkr.MultipleLocator(do.x_gridspacing))
-                main_ax.grid(True, which='both', linewidth=do.grid_linewidth)
+                    main_ax.yaxis.set_minor_locator(tkr.MultipleLocator(do.y_gridspacing))
+                # main_ax.grid(True, which='both', linewidth=do.grid_linewidth)
 
             if not do.do_spines:
                 main_ax.spines['top'].set_visible(False)
                 main_ax.spines['right'].set_visible(False)
 
+            if do.figax_callback:
+                do.figax_callback(fig,main_ax)
             self.exportToPdf(fig, export_mode)
             if export_mode != ExportMode.SAVE_ONLY:
                 return fig, main_ax
