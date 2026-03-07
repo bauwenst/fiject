@@ -1,0 +1,43 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # This works together with the "on push" to check out the tag that was pushed.
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Hatch
+        run: pip install hatch
+
+      - name: Check version matches tag
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/*/}
+          PROJECT_VERSION=$(hatch version)
+
+          echo "Git tag version: $TAG_VERSION"
+          echo "Project version: $PROJECT_VERSION"
+
+          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+            echo "❌ Version mismatch between tag ($TAG_VERSION) and pyproject.toml ($PROJECT_VERSION)"
+            exit 1
+          fi
+
+      - name: Publish to PyPI
+        env:
+          HATCH_INDEX_USER: __token__
+          HATCH_INDEX_AUTH: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          hatch build
+          hatch publish
