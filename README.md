@@ -4,6 +4,10 @@ Object-oriented, two-stage PDF figure generators in Python.
 Gives an answer to *"How can I change the look of a figure without re-computing its data?"* which isn't possible in
 `matplotlib` nor `seaborn`.
 
+```commandline
+pip install fiject
+```
+
 ## Features
 - Two-stage figure generation:
   - **Addition stage:** Incrementally add data to figure objects, rather than needing to do it all at once along with
@@ -44,30 +48,7 @@ have to redo your computation if you don't like the way your figure came out the
 just change the parameters to `g.commit()` and re-run *the same code* to get a new PDF `project-results_1.pdf`
 instantly.
 
-## Installation
-You can install `fiject` as any other package, or as a developer if you want to tinker with the source yourself.
-
-### Normal install
-Open a terminal and run:
-```commandline
-pip install git+https://github.com/bauwenst/fiject.git
-```
-Note that although the package's source code resides in the subdirectory `src/fiject/`, there is no need to mention this
-anywhere (not by you in the above command, and not even by me internally) because `pip` is smart enough to figure this
-out itself. You hence do *not* need to add a `#subdirectory` argument (despite [the docs saying you do](https://pip.pypa.io/en/stable/topics/vcs-support/#url-fragments)).
-
-### Developer install
-Open a terminal and, instead of the above, run:
-```commandline
-git clone https://github.com/bauwenst/fiject.git
-cd fiject
-pip install -e .
-```
-The last command will detect the `pyproject.toml` file (`pip install`), look for the `fiject/__init__.py` file in the 
-current directory (`.`), and put a symlink to this folder in Python's `site-packages` folder (`-e`). This means that
-when you `import fiject`, it is imported from the current folder and hence any changes you make here are applied immediately.
-
-### Troubleshooting
+## Troubleshooting the installation
 If, on a commit, you get an error that includes the text `This is pdfTeX` and under it something along the lines of
 ```
 ! LaTeX Error: File `type1cm.sty' not found.
